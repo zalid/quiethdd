@@ -285,11 +285,11 @@ Procedure setataapm(APMValue.l)
   If hDevice
     CloseHandle_( hDevice )
   EndIf
-  if retval=0
-    procedurereturn -1
-  else
-    procedurereturn 0
-  endif
+  If retval=0
+    ProcedureReturn -1
+  Else
+    ProcedureReturn 0
+  EndIf
 EndProcedure
 
 Procedure WinCallback(hwnd, msg, wParam, lParam)
@@ -345,19 +345,19 @@ If pcount >0
       EndIf
       APMValue = av 
       OpenConsole()
-      if APMValue<100 and warnuser=#True
-        Printn(CR+CR+"!!WARNING!!   APMVALUE < 100   !!WARNING!!"+CR+CR)
-        printN(help.s)
-      endif
+      If APMValue<100 And warnuser=#True
+        PrintN(CR+CR+"!!WARNING!!   APMVALUE < 100   !!WARNING!!"+CR+CR)
+        PrintN(help.s)
+      EndIf
       PrintN("eeeHDD Build:" + Str(#jaPBe_ExecuteBuild)+CR+CR)
-      PrintN("SETAPM: Setting to "+str(APMValue))
-      if setataapm(APMValue)<>0
+      PrintN("SETAPM: Setting to "+Str(APMValue))
+      If setataapm(APMValue)<>0
         PrintN("Ok.")
-      else
+      Else
         PrintN("Failed.")
-      endif
+      EndIf
       CloseConsole()
-      end
+      End
     EndIf
     If FindString(parm,"/APMVALUE:",0)
       v.s = StringField(parm,2,":")
@@ -469,10 +469,9 @@ DataSection
   nicon: IncludeBinary "quiethd.ico"
   gicon: IncludeBinary "quiethd_gn.ico"
 EndDataSection
-  
+   
 ; jaPBe Version=3.8.9.728
-; FoldLines=009300DC
-; Build=116
+; Build=117
 ; ProductName=eeeHDD
 ; ProductVersion=1.0
 ; FileDescription=eeeHDD diables the Automatic Power Management (APM) of the primary Harddrive and eliminates the annoying click sound that the Seagate HDD's produces
@@ -483,12 +482,12 @@ EndDataSection
 ; EMail=joern.koerner@gmail.com
 ; Web=http://sites.google.com/site/eeehddsite/
 ; Language=0x0000 Language Neutral
-; FirstLine=167
-; CursorPosition=249
+; FirstLine=263
+; CursorPosition=344
 ; EnableADMINISTRATOR
 ; EnableXP
 ; UseIcon=quiethd.ico
 ; ExecutableFormat=Windows
-; Executable=C:\Dokumente und Einstellungen\injk\Eigene Dateien\PMEvent\eeeHDD.exe
+; Executable=C:\Dokumente und Einstellungen\injk\Eigene Dateien\Source\eeeHDD\trunk\eeeHDD.exe
 ; DontSaveDeclare
 ; EOF
