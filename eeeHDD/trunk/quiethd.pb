@@ -118,6 +118,9 @@ help.s = help.s + "  /APMVALUE:n  Do not disable APM but set APM it to this valu
 help.s = help.s + "               Valid values are in range between 1-255"+CR
 help.s = help.s + "               Where 1 is the most active and 254 most inactive."+CR
 help.s = help.s + "               255 disables APM, 128 is factory default"+CR
+help.s = help.s + "  /SETAPM:n    Set the HDD APM level to this value and exit eeeHDD"+CR
+help.s = help.s + "               This option is useful to find out the best APM level for your"+CR
+help.s = help.s + "               drive. Best to be used from console!"+CR
 help.s = help.s + "  /NOWARN      Do not display a warning on small APM values <100"+CR+CR
 
 
@@ -160,26 +163,26 @@ Procedure setapm(APMValue.l)
   ; ;Initialize buffers...
   ; ; INPUT Commandbuffer
   ; regBuf_IN.IDEREGS
-  ; regBuf_IN\bFeaturesReg	= 0  ;0
-  ; regBuf_IN\bSectorCountReg	= 0  ;1 
-  ; regBuf_IN\bSectorNumberReg	= 0  ;2
-  ; regBuf_IN\bCylLowReg		= 0  ;3
-  ; regBuf_IN\bCylHighReg		= 0  ;4
-  ; regBuf_IN\bDriveHeadReg	= 0  ;5
-  ; regBuf_IN\bCommandReg		= 0  ;6
-  ; regBuf_IN\bReserved		= 0  ; reg[7] is reserved for future use. Must be zero.
-  ; regBuf_IN\DataBufferSize	= 0  ;8
+  ; regBuf_IN\bFeaturesReg  = 0  ;0
+  ; regBuf_IN\bSectorCountReg = 0  ;1 
+  ; regBuf_IN\bSectorNumberReg  = 0  ;2
+  ; regBuf_IN\bCylLowReg    = 0  ;3
+  ; regBuf_IN\bCylHighReg   = 0  ;4
+  ; regBuf_IN\bDriveHeadReg = 0  ;5
+  ; regBuf_IN\bCommandReg   = 0  ;6
+  ; regBuf_IN\bReserved   = 0  ; reg[7] is reserved for future use. Must be zero.
+  ; regBuf_IN\DataBufferSize  = 0  ;8
   ; ; OUTPUT Commandbuffer
   ; regBuf_OUT.IDEREGS
-  ; regBuf_OUT\bFeaturesReg	= 0  ;0
-  ; regBuf_OUT\bSectorCountReg	= 0  ;1 
-  ; regBuf_OUT\bSectorNumberReg	= 0  ;2
-  ; regBuf_OUT\bCylLowReg		= 0  ;3
-  ; regBuf_OUT\bCylHighReg	= 0  ;4
-  ; regBuf_OUT\bDriveHeadReg	= 0  ;5
-  ; regBuf_OUT\bCommandReg	= 0  ;6
-  ; regBuf_OUT\bReserved		= 0  ; reg[7] is reserved for future use. Must be zero.
-  ; regBuf_OUT\DataBufferSize	= 0  ;8
+  ; regBuf_OUT\bFeaturesReg = 0  ;0
+  ; regBuf_OUT\bSectorCountReg  = 0  ;1 
+  ; regBuf_OUT\bSectorNumberReg = 0  ;2
+  ; regBuf_OUT\bCylLowReg   = 0  ;3
+  ; regBuf_OUT\bCylHighReg  = 0  ;4
+  ; regBuf_OUT\bDriveHeadReg  = 0  ;5
+  ; regBuf_OUT\bCommandReg  = 0  ;6
+  ; regBuf_OUT\bReserved    = 0  ; reg[7] is reserved for future use. Must be zero.
+  ; regBuf_OUT\DataBufferSize = 0  ;8
   ; 
   ; bSize = SizeOf(regBuf_IN) ; Size of regBuf_IN - 8 for reg, 4 for DataBufferSize, 512 for Data
   ; 
@@ -282,6 +285,11 @@ Procedure setataapm(APMValue.l)
   If hDevice
     CloseHandle_( hDevice )
   EndIf
+  if retval=0
+    procedurereturn -1
+  else
+    procedurereturn 0
+  endif
 EndProcedure
 
 Procedure WinCallback(hwnd, msg, wParam, lParam)
@@ -325,6 +333,31 @@ If pcount >0
     EndIf
     If parm = "/NOWARN"
       warnuser=#False
+    EndIf
+    If FindString(parm,"/SETAPM:",0)
+      v.s = StringField(parm,2,":")
+      av = Val(v)
+      If av <1
+        av=1
+      EndIf
+      If av>254
+        av=255
+      EndIf
+      APMValue = av 
+      OpenConsole()
+      if APMValue<100 and warnuser=#True
+        Printn(CR+CR+"!!WARNING!!   APMVALUE < 100   !!WARNING!!"+CR+CR)
+        printN(help.s)
+      endif
+      PrintN("eeeHDD Build:" + Str(#jaPBe_ExecuteBuild)+CR+CR)
+      PrintN("SETAPM: Setting to "+str(APMValue))
+      if setataapm(APMValue)<>0
+        PrintN("Ok.")
+      else
+        PrintN("Failed.")
+      endif
+      CloseConsole()
+      end
     EndIf
     If FindString(parm,"/APMVALUE:",0)
       v.s = StringField(parm,2,":")
@@ -426,7 +459,7 @@ If OpenWindow(0, 200, 300, 400, 200,"eeeHDD",#PB_Window_SystemMenu | #PB_Window_
 
   Until quit=#True
  
-EndIf	;OpenWindow
+EndIf ;OpenWindow
 
 End 
 
@@ -436,7 +469,7 @@ DataSection
   nicon: IncludeBinary "quiethd.ico"
   gicon: IncludeBinary "quiethd_gn.ico"
 EndDataSection
-  
+  
 ; jaPBe Version=3.8.9.728
 ; FoldLines=009300DC
 ; Build=116
