@@ -223,7 +223,7 @@ Procedure setapm(APMValue.l)
   ; EndIf
 EndProcedure
 
-Procedure setataapm(APMValue.l)
+Procedure.l setataapm(APMValue.l)
   ; \\.\PhysicalDrive0
   hDevice = CreateFile_( "\\.\PhysicalDrive0", #GENERIC_READ | #GENERIC_WRITE, #FILE_SHARE_READ | #FILE_SHARE_WRITE, 0, #OPEN_EXISTING, 0, 0)
   If hDevice = #INVALID_HANDLE_VALUE
@@ -330,6 +330,7 @@ If pcount >0
       PrintN("-- PRESS RETURN --")
       Input()
       CloseConsole()
+      End
     EndIf
     If parm = "/NOWARN"
       warnuser=#False
@@ -345,17 +346,20 @@ If pcount >0
       EndIf
       APMValue = av 
       OpenConsole()
+      PrintN("eeeHDD Build:" + Str(#jaPBe_ExecuteBuild)+CR+CR)
+      PrintN("SETAPM: Setting to "+Str(APMValue))
       If APMValue<100 And warnuser=#True
         PrintN(CR+CR+"!!WARNING!!   APMVALUE < 100   !!WARNING!!"+CR+CR)
         PrintN(help.s)
       EndIf
-      PrintN("eeeHDD Build:" + Str(#jaPBe_ExecuteBuild)+CR+CR)
-      PrintN("SETAPM: Setting to "+Str(APMValue))
-      If setataapm(APMValue)<>0
+      
+      If setataapm(APMValue)=0
         PrintN("Ok.")
       Else
         PrintN("Failed.")
       EndIf
+      PrintN("-- PRESS RETURN --")
+      Input()
       CloseConsole()
       End
     EndIf
@@ -471,7 +475,7 @@ DataSection
 EndDataSection
    
 ; jaPBe Version=3.8.9.728
-; Build=117
+; Build=121
 ; ProductName=eeeHDD
 ; ProductVersion=1.0
 ; FileDescription=eeeHDD diables the Automatic Power Management (APM) of the primary Harddrive and eliminates the annoying click sound that the Seagate HDD's produces
@@ -482,8 +486,8 @@ EndDataSection
 ; EMail=joern.koerner@gmail.com
 ; Web=http://sites.google.com/site/eeehddsite/
 ; Language=0x0000 Language Neutral
-; FirstLine=263
-; CursorPosition=344
+; FirstLine=269
+; CursorPosition=355
 ; EnableADMINISTRATOR
 ; EnableXP
 ; UseIcon=quiethd.ico
