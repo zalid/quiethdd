@@ -55,6 +55,15 @@ Enumeration
   #outReserved         ;7
 EndEnumeration
 
+Structure SYSTEM_POWER_STATUS
+  ACLineStatus.b       ;0-Offline, 1-Online, 255-Unknown
+  BatteryFlag.b        ;1-Bat.over 66% full, 2-less that 33%, 4-Critical, 8-Charging, 128-NoBattery, 255-Unknown
+  BatteryLifePercent.b ;0-100 Percentage of full battery charge remaining
+  Reserved1.b
+  BatteryLifeTime.l    ;Number of seconds batt life remaining, or -1=unknown
+  BatteryFullLifeTime.l ;Number of seconds batt life when full charge, or -1=unknown
+EndStructure
+
 Structure IDEREGS   ; this is also ATA_PASS_THROUGH?! IDEREGS is without DataBuffersize and DataBuffer
   bFeaturesReg.c      ;0
   bSectorCountReg.c   ;1 
@@ -103,25 +112,28 @@ EndStructure
 Global DisableSuspend = 0
 Global pdebug=#False, tray=#True, help.s, APMValue.l=255, warnuser=#True
 
-help.s =          "eeeHDD Build:" + Str(#jaPBe_ExecuteBuild)+CR+CR
-help.s = help.s + "Homepage http://sites.google.com/site/eeehddsite/"+CR+CR
-help.s = help.s + "eeeHDD disables/modifies the harddrives APM feature setting"+CR
+help.s =          "quietHDD Build:" + Str(#jaPBe_ExecuteBuild)+CR+CR
+help.s = help.s + "Homepage http://sites.google.com/site/quiethdd/"+CR+CR
+help.s = help.s + "quietHDD disables/modifies the harddrives APM feature setting"+CR
 help.s = help.s + "Modifying APM value also controls HDD's spindown rate. Do not let your HDD"+CR
 help.s = help.s + "spindown/spinup too often when you set small values (less 128) as it"+CR
 help.s = help.s + "shortens then life of your HDD!  You have been warned!"+CR+CR
 help.s = help.s + "Usage:"+CR
-help.s = help.s + "eeehdd.exe [/DEBUG] [/NOTRAY] [/APMVALUE:n] [/NOWARN]"+CR
-help.s = help.s + "  /DEBUG       Opens a console window for debug output"+CR
-help.s = help.s + "  /NOTRAY      Do not add systray icon. In this case eeeHDD"+CR
-help.s = help.s + "               can be terminated in the taskmanager only."+CR
-help.s = help.s + "  /APMVALUE:n  Do not disable APM but set APM it to this value."+CR
-help.s = help.s + "               Valid values are in range between 1-255"+CR
-help.s = help.s + "               Where 1 is the most active and 254 most inactive."+CR
-help.s = help.s + "               255 disables APM, 128 is factory default"+CR
-help.s = help.s + "  /SETAPM:n    Set the HDD APM level to this value and exit eeeHDD"+CR
-help.s = help.s + "               This option is useful to find out the best APM level for your"+CR
-help.s = help.s + "               drive. Best to be used from console!"+CR
-help.s = help.s + "  /NOWARN      Do not display a warning on small APM values <100"+CR+CR
+help.s = help.s + "quiethdd.exe [/DEBUG] [/NOTRAY] [/APMVALUE:n] [/NOWARN]"+CR
+help.s = help.s + "  /DEBUG         Opens a console window for debug output"+CR
+help.s = help.s + "  /NOTRAY        Do not add systray icon. In this case quietHDD"+CR
+help.s = help.s + "                 can be terminated in the taskmanager only."+CR
+help.s = help.s + "  /ACAPMVALUE:n  APM Value to set when running on AC Power"+CR
+help.s = help.s + "                 Valid values are in range between 1-255"+CR
+help.s = help.s + "                 Where 1 is the most active and 254 most inactive."+CR
+help.s = help.s + "                 255 disables APM, 128 is factory default"+CR
+help.s = help.s + "                 Defaults to 255 when not explicit set."+CR
+help.s = help.s + "  /DCAPMVALUE:n  APM Value to set when running on Battery power"+CR
+help.s = help.s + "                 Defaults to 255 when not explicit set."+CR
+help.s = help.s + "  /SETAPM:n      Set the HDD APM level to this value and exit eeeHDD"+CR
+help.s = help.s + "                 This option is useful to find out the best APM level for your"+CR
+help.s = help.s + "                 drive. Best to be used from console!"+CR
+help.s = help.s + "  /NOWARN        Do not display a warning on small APM values <100"+CR+CR
 
 
 If Not IsUserAnAdmin_()
@@ -307,6 +319,8 @@ Procedure WinCallback(hwnd, msg, wParam, lParam)
       setataapm(APMValue)
       InfoText()
       BlinkIcon()
+    Case #PBT_APMPOWERSTATUSCHANGE  ; System Power Status has changed.
+      ;Now we've to find out what happened.
     EndSelect
     
   EndIf
@@ -363,7 +377,7 @@ If pcount >0
       CloseConsole()
       End
     EndIf
-    If FindString(parm,"/APMVALUE:",0)
+    If FindString(parm,"/ACAPMVALUE:",0)
       v.s = StringField(parm,2,":")
       av = Val(v)
       If av <1
@@ -372,21 +386,35 @@ If pcount >0
       If av>254
         av=255
       EndIf
-      APMValue = av 
+      ACAPMValue = av 
+    EndIf
+    If FindString(parm,"/DCAPMVALUE:",0)
+      v.s = StringField(parm,2,":")
+      av = Val(v)
+      If av <1
+        av=1
+      EndIf
+      If av>254
+        av=255
+      EndIf
+      DCAPMValue = av 
     EndIf
   Next
 EndIf
 
-If APMValue<100 And warnuser=#True
-  MessageRequester("!!WARNING!!   APMVALUE < 100   !!WARNING!!", help.s , #MB_OK|#MB_ICONINFORMATION) 
+If ACAPMValue<100 And warnuser=#True
+  MessageRequester("!!WARNING!!   ACAPMVALUE < 100   !!WARNING!!", help.s , #MB_OK|#MB_ICONINFORMATION) 
+EndIf
+If DCAPMValue<100 And warnuser=#True
+  MessageRequester("!!WARNING!!   DCAPMVALUE < 100   !!WARNING!!", help.s , #MB_OK|#MB_ICONINFORMATION) 
 EndIf
 
 If pdebug = #True
   OpenConsole()
-  PrintN("eeeHDD: Debug is turned on."+CR)
+  PrintN("quietHDD: Debug is turned on."+CR)
 EndIf
 
-If OpenWindow(0, 200, 300, 400, 200,"eeeHDD",#PB_Window_SystemMenu | #PB_Window_MinimizeGadget | #PB_Window_MaximizeGadget | #PB_Window_Invisible)
+If OpenWindow(0, 200, 300, 400, 200,"quietHDD",#PB_Window_SystemMenu | #PB_Window_MinimizeGadget | #PB_Window_MaximizeGadget | #PB_Window_Invisible)
   SetWindowCallback(@WinCallback())
 
   If tray = #True
@@ -474,8 +502,9 @@ DataSection
   gicon: IncludeBinary "quiethd_gn.ico"
 EndDataSection
    
-; jaPBe Version=3.8.9.728
-; Build=121
+; jaPBe Version=3.8.10.733
+; FoldLines=00A200EB00ED0130
+; Build=122
 ; ProductName=eeeHDD
 ; ProductVersion=1.0
 ; FileDescription=eeeHDD diables the Automatic Power Management (APM) of the primary Harddrive and eliminates the annoying click sound that the Seagate HDD's produces
@@ -486,8 +515,8 @@ EndDataSection
 ; EMail=joern.koerner@gmail.com
 ; Web=http://sites.google.com/site/eeehddsite/
 ; Language=0x0000 Language Neutral
-; FirstLine=269
-; CursorPosition=355
+; FirstLine=260
+; CursorPosition=426
 ; EnableADMINISTRATOR
 ; EnableXP
 ; UseIcon=quiethd.ico
