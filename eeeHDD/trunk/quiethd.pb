@@ -55,14 +55,42 @@ Enumeration
   #outReserved         ;7
 EndEnumeration
 
-Structure SYSTEM_POWER_STATUS
-  ACLineStatus.b       ;0-Offline, 1-Online, 255-Unknown
-  BatteryFlag.b        ;1-Bat.over 66% full, 2-less that 33%, 4-Critical, 8-Charging, 128-NoBattery, 255-Unknown
-  BatteryLifePercent.b ;0-100 Percentage of full battery charge remaining
-  Reserved1.b
-  BatteryLifeTime.l    ;Number of seconds batt life remaining, or -1=unknown
-  BatteryFullLifeTime.l ;Number of seconds batt life when full charge, or -1=unknown
-EndStructure
+;- Window Constants
+;
+Enumeration
+  #Window_0
+EndEnumeration
+
+;- Gadget Constants
+;
+Enumeration
+  #Frame3D_0
+  #Frame3D_1
+  #tb_mAPMValue
+  #txt_mAPMValue
+  #bt_SetAPMValue
+  #tb_ACValue
+  #Text_1
+  #Text_3
+  #tb_DCValue
+  #txt_ACValue
+  #txt_DCValue
+  #bt_Apply
+  #bt_Ok
+  #bt_Cancel
+EndEnumeration
+
+
+; Structure SYSTEM_POWER_STATUS
+  ; ACLineStatus.b       ;0-Offline, 1-Online, 255-Unknown
+  ; BatteryFlag.b        ;1-Bat.over 66% full, 2-less that 33%, 4-Critical, 8-Charging, 128-NoBattery, 255-Unknown
+  ; BatteryLifePercent.b ;0-100 Percentage of full battery charge remaining
+  ; Reserved1.b
+  ; BatteryLifeTime.l    ;Number of seconds batt life remaining, or -1=unknown
+  ; BatteryFullLifeTime.l ;Number of seconds batt life when full charge, or -1=unknown
+; EndStructure
+
+
 
 Structure IDEREGS   ; this is also ATA_PASS_THROUGH?! IDEREGS is without DataBuffersize and DataBuffer
   bFeaturesReg.c      ;0
@@ -110,13 +138,13 @@ Structure ATA_PASS_THROUGH_EX_WITH_BUFFERS
 EndStructure
 
 Global DisableSuspend = 0
-Global pdebug=#False, tray=#True, help.s, APMValue.l=255, warnuser=#True
+Global pdebug=#False, tray=#True, help.s, APMValue.l=255, ACAPMValue.l=255, DCAPMValue.l=255, warnuser=#True
 
 help.s =          "quietHDD Build:" + Str(#jaPBe_ExecuteBuild)+CR+CR
 help.s = help.s + "Homepage http://sites.google.com/site/quiethdd/"+CR+CR
 help.s = help.s + "quietHDD disables/modifies the harddrives APM feature setting"+CR
 help.s = help.s + "Modifying APM value also controls HDD's spindown rate. Do not let your HDD"+CR
-help.s = help.s + "spindown/spinup too often when you set small values (less 128) as it"+CR
+help.s = help.s + "spindown/spinup too often when you set small values (less 128) as it may"+CR
 help.s = help.s + "shortens then life of your HDD!  You have been warned!"+CR+CR
 help.s = help.s + "Usage:"+CR
 help.s = help.s + "quiethdd.exe [/DEBUG] [/NOTRAY] [/APMVALUE:n] [/NOWARN]"+CR
@@ -130,16 +158,22 @@ help.s = help.s + "                 255 disables APM, 128 is factory default"+CR
 help.s = help.s + "                 Defaults to 255 when not explicit set."+CR
 help.s = help.s + "  /DCAPMVALUE:n  APM Value to set when running on Battery power"+CR
 help.s = help.s + "                 Defaults to 255 when not explicit set."+CR
-help.s = help.s + "  /SETAPM:n      Set the HDD APM level to this value and exit eeeHDD"+CR
+help.s = help.s + "  /SETAPM:n      Set the HDD APM level to this value and exit quietHDD"+CR
 help.s = help.s + "                 This option is useful to find out the best APM level for your"+CR
 help.s = help.s + "                 drive. Best to be used from console!"+CR
-help.s = help.s + "  /NOWARN        Do not display a warning on small APM values <100"+CR+CR
+help.s = help.s + "  /NOWARN        Do not display a warning on APM values < 100"+CR+CR
 
 
 If Not IsUserAnAdmin_()
   MessageRequester("Error", "This program requires administrator rights."+Chr(13)+"Use 'surun' or 'runas' to start this program."+Chr(13)+"Quitting now.",#PB_MessageRequester_Ok)
   End  
 EndIf
+
+Procedure AboutImageRequester(WindowID.l,Title$,Text1$,Text2$,Image.l)
+  ;LoadImage(1, Image$)
+  ;Image.l=ImageID(1)
+  ShellAbout_(WindowID, Title$+" # "+Text1$, Text2$, Image)
+EndProcedure
 
 
 Procedure BlinkIcon()
@@ -159,6 +193,48 @@ Procedure.s InfoText()
   ProcedureReturn txt
 EndProcedure
 
+Procedure ReadSettings()
+  ; Try to open quietHDD.ini
+  CallDebugger
+  If OpenPreferences("quietHDD.ini")
+    ACAPMValue = ReadPreferenceInteger("AC_APM_Value", ACAPMValue)
+    DCAPMValue = ReadPreferenceInteger("DC_APM_Value", DCAPMValue)
+  Else
+    ; Open failed. Try to create a new one
+    If CreatePreferences("quietHDD.ini")
+      WritePreferenceInteger("AC_APM_Value", ACAPMValue)
+      WritePreferenceInteger("DC_APM_Value", DCAPMValue)
+      
+    Else
+      ; Create failed. Inform the user
+      MessageRequester("Warning", "Failed to create quietHDD.ini preferences file."+Chr(13)+"User defined preferences will not be saved.",#PB_MessageRequester_Ok)
+    EndIf
+  EndIf
+  ClosePreferences()
+EndProcedure
+
+Procedure WriteSettings()
+  ; Try to open quietHDD.ini
+  ;Global pdebug=#False, tray=#True, help.s, APMValue.l=255, ACAPMValue.l=255, DCAPMValue.l=255, warnuser=#True
+  
+  MessageRequester("","12345678901234567890123456789012345678901234567890123456789012345678901234567890123456789")
+  CallDebugger
+  If OpenPreferences("quietHDD.ini")
+    WritePreferenceInteger("AC_APM_Value", ACAPMValue)
+    WritePreferenceInteger("DC_APM_Value", DCAPMValue)
+  Else
+    ; Open failed. Try to create a new one
+    If CreatePreferences("quietHDD.ini")
+      WritePreferenceInteger("AC_APM_Value", ACAPMValue)
+      WritePreferenceInteger("DC_APM_Value", DCAPMValue)
+      
+    Else
+      ; Create failed. Inform the user
+      MessageRequester("Warning", "Failed to create quietHDD.ini preferences file."+Chr(13)+"User defined preferences will not be saved.",#PB_MessageRequester_Ok)
+    EndIf
+  EndIf
+  ClosePreferences()
+EndProcedure
 
 Procedure setapm(APMValue.l)
   ; DO NOT USE THIS ANYMORE!
@@ -280,7 +356,7 @@ Procedure.l setataapm(APMValue.l)
   bytesRet.l = 0
   retval = DeviceIoControl_( hDevice, #IOCTL_ATA_PASS_THROUGH, @ab, dbsize.l, @ab, dbsize.l, @bytesRet, #Null) 
   If retval=0
-    MessageRequester("Error", "IOCTL_ATA_PASS_THROUGH failed. Reason:0x"+RSet(Hex(GetLastError_()), 8, "0")+Chr(13)+Chr(13)+"Run eeeHDD with /DEBUG argument to get more information",#PB_MessageRequester_Ok)
+    MessageRequester("Error", "IOCTL_ATA_PASS_THROUGH failed. Reason:0x"+RSet(Hex(GetLastError_()), 8, "0")+Chr(13)+Chr(13)+"Run quietHDD with /DEBUG argument to get more information",#PB_MessageRequester_Ok)
   EndIf
   If pdebug=#True
     PrintN("Output registers:")
@@ -304,6 +380,9 @@ Procedure.l setataapm(APMValue.l)
   EndIf
 EndProcedure
 
+
+
+
 Procedure WinCallback(hwnd, msg, wParam, lParam)
   result = #PB_ProcessPureBasicEvents
   If msg = #WM_POWERBROADCAST
@@ -326,6 +405,8 @@ Procedure WinCallback(hwnd, msg, wParam, lParam)
   EndIf
   ProcedureReturn result
 EndProcedure
+
+ReadSettings()
 
 pcount = CountProgramParameters()
 If pcount >0
@@ -360,7 +441,7 @@ If pcount >0
       EndIf
       APMValue = av 
       OpenConsole()
-      PrintN("eeeHDD Build:" + Str(#jaPBe_ExecuteBuild)+CR+CR)
+      PrintN("quietHDD Build:" + Str(#jaPBe_ExecuteBuild)+CR+CR)
       PrintN("SETAPM: Setting to "+Str(APMValue))
       If APMValue<100 And warnuser=#True
         PrintN(CR+CR+"!!WARNING!!   APMVALUE < 100   !!WARNING!!"+CR+CR)
@@ -414,26 +495,52 @@ If pdebug = #True
   PrintN("quietHDD: Debug is turned on."+CR)
 EndIf
 
-If OpenWindow(0, 200, 300, 400, 200,"quietHDD",#PB_Window_SystemMenu | #PB_Window_MinimizeGadget | #PB_Window_MaximizeGadget | #PB_Window_Invisible)
+If OpenWindow(0, 100, 100, 456, 302, "quietHDD Settings",#PB_Window_SystemMenu |  #PB_Window_Invisible) ;#PB_Window_MinimizeGadget | #PB_Window_MaximizeGadget |
+  
+  If CreateGadgetList(WindowID(#Window_0))
+    Frame3DGadget(#Frame3D_0, 8, 8, 440, 178, "AC and DC Settings")
+    Frame3DGadget(#Frame3D_1, 8, 200, 440, 92, "Manual APM Settings")
+    TrackBarGadget(#tb_mAPMValue, 16, 216, 390, 30, 0, 255)
+    TextGadget(#txt_mAPMValue, 408, 220, 30, 16, "0", #PB_Text_Right)
+    ButtonGadget(#bt_SetAPMValue, 248, 256, 186, 22, "Set APM Value")
+    TrackBarGadget(#tb_ACValue, 16, 48, 390, 30, 0, 255)
+    TextGadget(#Text_1, 16, 32, 220, 20, "AC Value (running on AC power)")
+    TextGadget(#Text_3, 16, 96, 220, 20, "DC Value (running on battery)")
+    TrackBarGadget(#tb_DCValue, 16, 112, 390, 30, 0, 255)
+    TextGadget(#txt_ACValue, 410, 52, 30, 20, "0", #PB_Text_Right)
+    TextGadget(#txt_DCValue, 408, 115, 30, 20, "0", #PB_Text_Right)
+    ButtonGadget(#bt_Apply, 344, 152, 90, 22, "Apply")
+    ButtonGadget(#bt_Ok, 152, 152, 90, 22, "Ok")
+    ButtonGadget(#bt_Cancel, 248, 152, 90, 22, "Cancel")
+    
+    SetGadgetState(#tb_ACValue, ACAPMValue)
+    SetGadgetState(#tb_DCValue, DCAPMValue)
+    SetGadgetText(#txt_ACValue, Str(ACAPMValue))
+    SetGadgetText(#txt_DCValue, Str(DCAPMValue))
+    SetGadgetState(#tb_mAPMValue, 128)
+    SetGadgetText(#txt_mAPMValue, Str(128))
+  EndIf
+  
   SetWindowCallback(@WinCallback())
 
   If tray = #True
     If CreatePopupMenu(0)
       MenuItem(1, "")
       MenuBar()
-      MenuItem(2, "Disable System Suspend")
-      MenuItem(3, "Disable HDD APM now")
+      MenuItem(2, "Settings")
+      MenuItem(3, "Disable System Suspend")
+      MenuItem(4, "Disable HDD APM now")
       MenuBar()
-      MenuItem(4, "About / Help")
+      MenuItem(5, "About / Help")
       MenuBar()
-      MenuItem(5, "Quit")
+      MenuItem(6, "Quit")
       DisableMenuItem(0, 1, 1) ; Item 1 is used to display some text.
     EndIf 
     
     CatchImage(0, ?nicon)
     CatchImage(1, ?gicon)
     AddSysTrayIcon(0, WindowID(0), ImageID(0))
-    SysTrayIconToolTip (0, "eeeHDD"+Chr(13)+"Build: " + Str(#jaPBe_ExecuteBuild) + Chr(13) + "APMValue: "+Str(APMValue))
+    SysTrayIconToolTip (0, "quietHDD"+Chr(13)+"Build: " + Str(#jaPBe_ExecuteBuild) + Chr(13) + "APMValue: "+Str(APMValue))
   EndIf
   
   ; Set APM on startup
@@ -448,10 +555,13 @@ If OpenWindow(0, 200, 300, 400, 200,"quietHDD",#PB_Window_SystemMenu | #PB_Windo
 
   Repeat
     EventID.l=WaitWindowEvent()
-
+    WindowID = EventWindow() ; The Window where the event is generated, can be used in the gadget procedures
+    GadgetID = EventGadget() ; Is it a gadget event?
+    EventType = EventType() ; The event type
+    
     ; Make sure we check for System tray events...
     If EventID=#PB_Event_SysTray
-      If EventType()=#PB_EventType_RightClick
+      If EventType=#PB_EventType_RightClick
         DisplayPopupMenu(0, WindowID(0))
       EndIf
     EndIf
@@ -459,7 +569,10 @@ If OpenWindow(0, 200, 300, 400, 200,"quietHDD",#PB_Window_SystemMenu | #PB_Windo
     If EventID=#PB_Event_Menu ; <<-- PopUp Event
     ; Check for Right Mouse Button Menu and Restore Window or Quit...
       Select EventMenu()
-        Case 2 ; Disable suspend
+        Case 2 ; Settings
+          ShowWindow_(WindowID(0),#SW_SHOW)
+          Minimized=#False
+        Case 3 ; Disable suspend
           If tray = 1
             If GetMenuItemState(0,2) = 1
               SetMenuItemState(0,2,0)
@@ -469,16 +582,17 @@ If OpenWindow(0, 200, 300, 400, 200,"quietHDD",#PB_Window_SystemMenu | #PB_Windo
               DisableSuspend = 1
             EndIf
           EndIf
-        Case 3 ; Set HDD APM
+        Case 4 ; Set HDD APM
           setataapm(APMValue)
           
           If tray = 1
             InfoText()
             BlinkIcon()
           EndIf
-        Case 4 ; About/Help
-          MessageRequester("About eeeHDD", help.s , #MB_OK|#MB_ICONINFORMATION)  
-        Case 5 ; Quit
+        Case 5 ; About/Help
+          ;MessageRequester("About quietHDD", help.s , #MB_OK|#MB_ICONINFORMATION)  
+          AboutImageRequester(WindowID(0),  "About quietHDD", "Text1", help.s , ImageID(0))  
+        Case 6 ; Quit
           quit=#True
       EndSelect
     EndIf
@@ -487,8 +601,46 @@ If OpenWindow(0, 200, 300, 400, 200,"quietHDD",#PB_Window_SystemMenu | #PB_Windo
     If EventID=#PB_Event_CloseWindow And Minimized=#False ; <-- Check for the eXit Button and not SysTrayIcon
       ShowWindow_(WindowID(0),#SW_HIDE)
       Minimized=#True
+      ;TODO: Apply settings before closeing window
     EndIf
 
+    
+    ;Events related to the setting Window
+    If EventID = #PB_Event_Gadget
+      
+      If GadgetID = #tb_mAPMValue
+        mAPMValue = GetGadgetState(#tb_mAPMValue)
+        SetGadgetText(#txt_mAPMValue, Str(mAPMValue))
+      ElseIf GadgetID = #bt_SetAPMValue
+        If setataapm(GetGadgetState(#tb_mAPMValue))=0
+          
+        EndIf
+      ElseIf GadgetID = #tb_ACValue
+        ACValue = GetGadgetState(#tb_ACValue)
+        SetGadgetText(#txt_ACValue, Str(ACValue))
+        
+      ElseIf GadgetID = #tb_DCValue
+        DCValue = GetGadgetState(#tb_DCValue)
+        SetGadgetText(#txt_DCValue, Str(DCValue))
+        
+      ElseIf GadgetID = #bt_Apply ; Write, Apply
+        ACAPMValue = GetGadgetState(#tb_ACValue)
+        DCAPMValue = GetGadgetState(#tb_DCValue)
+        WriteSettings()
+      ElseIf GadgetID = #bt_Ok  ; Write, Apply, CloseWin
+        ACAPMValue = GetGadgetState(#tb_ACValue)
+        DCAPMValue = GetGadgetState(#tb_DCValue)
+        WriteSettings()
+        ShowWindow_(WindowID(0),#SW_HIDE)
+        Minimized=#True
+      ElseIf GadgetID = #bt_Cancel
+        ShowWindow_(WindowID(0),#SW_HIDE)
+        Minimized=#True
+      EndIf
+      
+    EndIf
+    
+    
   Until quit=#True
  
 EndIf ;OpenWindow
@@ -503,7 +655,7 @@ DataSection
 EndDataSection
    
 ; jaPBe Version=3.8.10.733
-; FoldLines=00A200EB00ED0130
+; FoldLines=00EE01370139017C
 ; Build=122
 ; ProductName=eeeHDD
 ; ProductVersion=1.0
@@ -515,8 +667,8 @@ EndDataSection
 ; EMail=joern.koerner@gmail.com
 ; Web=http://sites.google.com/site/eeehddsite/
 ; Language=0x0000 Language Neutral
-; FirstLine=260
-; CursorPosition=426
+; FirstLine=413
+; CursorPosition=589
 ; EnableADMINISTRATOR
 ; EnableXP
 ; UseIcon=quiethd.ico
