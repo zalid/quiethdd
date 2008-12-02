@@ -78,6 +78,7 @@ Enumeration
   #bt_Apply
   #bt_Ok
   #bt_Cancel
+  #txt_mAPMWarning
 EndEnumeration
 
 
@@ -138,7 +139,9 @@ Structure ATA_PASS_THROUGH_EX_WITH_BUFFERS
 EndStructure
 
 Global DisableSuspend = 0
-Global pdebug=#False, tray=#True, help.s, APMValue.l=255, ACAPMValue.l=255, DCAPMValue.l=255, warnuser=#True
+Global pdebug=#False, tray=#True, warnuser=#True, help.s
+Global APMValue.l=255, ACAPMValue.l=255, DCAPMValue.l=255
+Global PwrStat.SYSTEM_POWER_STATUS, PwrLastLineStatus.b
 
 help.s =          "quietHDD Build:" + Str(#jaPBe_ExecuteBuild)+CR+CR
 help.s = help.s + "Homepage http://sites.google.com/site/quiethdd/"+CR+CR
@@ -185,25 +188,45 @@ Procedure BlinkIcon()
   Next i
 EndProcedure
 
-Procedure.s InfoText()
-  txt.s = "APM value "+Str(APMValue)+" last set on "+FormatDate("%YYYY-%MM-%DD %HH:%II:%SS", Date())
+Procedure.s InfoText(text.s="")
+  If text=""
+    If PwrStat\ACLineStatus = 0 ; Battery
+      prefix.s = "DC "
+    ElseIf PwrStat\ACLineStatus = 1 ; AC Power
+      prefix.s = "AC "
+    Else
+      prefix.s = ""
+    EndIf
+    txt.s = prefix + "APM value "+Str(APMValue)+" last set on "+FormatDate("%YYYY-%MM-%DD %HH:%II:%SS", Date())
+  Else
+    txt.s = text.s 
+  EndIf
   If tray=#True
     SetMenuItemText(0, 1, txt)
+    SysTrayIconToolTip (0, "quietHDD"+Chr(13)+"Build: " + Str(#jaPBe_ExecuteBuild) + Chr(13) + prefix + "APMValue: "+Str(APMValue))
   EndIf
   ProcedureReturn txt
 EndProcedure
 
+Procedure CheckValues()
+  If ACAPMValue<100 And warnuser=#True
+    MessageRequester("!!WARNING!!   ACAPMVALUE < 100   !!WARNING!!", help.s , #MB_OK|#MB_ICONINFORMATION) 
+  EndIf
+  If DCAPMValue<100 And warnuser=#True
+    MessageRequester("!!WARNING!!   DCAPMVALUE < 100   !!WARNING!!", help.s , #MB_OK|#MB_ICONINFORMATION) 
+  EndIf
+EndProcedure
+
 Procedure ReadSettings()
   ; Try to open quietHDD.ini
-  CallDebugger
   If OpenPreferences("quietHDD.ini")
-    ACAPMValue = ReadPreferenceInteger("AC_APM_Value", ACAPMValue)
-    DCAPMValue = ReadPreferenceInteger("DC_APM_Value", DCAPMValue)
+    ACAPMValue = ReadPreferenceLong("AC_APM_Value", ACAPMValue)
+    DCAPMValue = ReadPreferenceLong("DC_APM_Value", DCAPMValue)
   Else
     ; Open failed. Try to create a new one
     If CreatePreferences("quietHDD.ini")
-      WritePreferenceInteger("AC_APM_Value", ACAPMValue)
-      WritePreferenceInteger("DC_APM_Value", DCAPMValue)
+      WritePreferenceLong("AC_APM_Value", ACAPMValue)
+      WritePreferenceLong("DC_APM_Value", DCAPMValue)
       
     Else
       ; Create failed. Inform the user
@@ -217,16 +240,14 @@ Procedure WriteSettings()
   ; Try to open quietHDD.ini
   ;Global pdebug=#False, tray=#True, help.s, APMValue.l=255, ACAPMValue.l=255, DCAPMValue.l=255, warnuser=#True
   
-  MessageRequester("","12345678901234567890123456789012345678901234567890123456789012345678901234567890123456789")
-  CallDebugger
   If OpenPreferences("quietHDD.ini")
-    WritePreferenceInteger("AC_APM_Value", ACAPMValue)
-    WritePreferenceInteger("DC_APM_Value", DCAPMValue)
+    WritePreferenceLong("AC_APM_Value", ACAPMValue)
+    WritePreferenceLong("DC_APM_Value", DCAPMValue)
   Else
     ; Open failed. Try to create a new one
     If CreatePreferences("quietHDD.ini")
-      WritePreferenceInteger("AC_APM_Value", ACAPMValue)
-      WritePreferenceInteger("DC_APM_Value", DCAPMValue)
+      WritePreferenceLong("AC_APM_Value", ACAPMValue)
+      WritePreferenceLong("DC_APM_Value", DCAPMValue)
       
     Else
       ; Create failed. Inform the user
@@ -380,8 +401,14 @@ Procedure.l setataapm(APMValue.l)
   EndIf
 EndProcedure
 
-
-
+Procedure SmartSetAPM()
+  ; Set APM on startup
+  setataapm(APMValue)
+  If tray = #True
+    InfoText()
+    BlinkIcon()  
+  EndIf
+EndProcedure
 
 Procedure WinCallback(hwnd, msg, wParam, lParam)
   result = #PB_ProcessPureBasicEvents
@@ -395,12 +422,28 @@ Procedure WinCallback(hwnd, msg, wParam, lParam)
       EndIf  
     Case #PBT_APMRESUMEAUTOMATIC
       ;MessageRequester("Information", "Resume from Suspend", #PB_MessageRequester_Ok)#
-      setataapm(APMValue)
-      InfoText()
-      BlinkIcon()
+      SmartSetAPM()
     Case #PBT_APMPOWERSTATUSCHANGE  ; System Power Status has changed.
       ;Now we've to find out what happened.
-    EndSelect
+      If GetSystemPowerStatus_(@PwrStat)=0
+        MessageRequester("Warning", "GetSystemPowerStatus() failed. Unable to determine AC/DC informations.", #PB_MessageRequester_Ok)
+      Else
+        If PwrStat\ACLineStatus <> PwrLastLineStatus
+          PwrLastLineStatus =  PwrStat\ACLineStatus
+          If PwrStat\ACLineStatus = 0  ;Battery
+            APMValue = DCAPMValue
+            SmartSetAPM()
+          ElseIf PwrStat\ACLineStatus = 1 ;AC Power
+            APMValue = ACAPMValue
+            SmartSetAPM()
+          Else
+            ;Unknown power status
+            InfoText("Unknown Power Status")
+            BlinkIcon()
+          EndIf
+        EndIf
+      EndIf
+      EndSelect
     
   EndIf
   ProcedureReturn result
@@ -483,12 +526,7 @@ If pcount >0
   Next
 EndIf
 
-If ACAPMValue<100 And warnuser=#True
-  MessageRequester("!!WARNING!!   ACAPMVALUE < 100   !!WARNING!!", help.s , #MB_OK|#MB_ICONINFORMATION) 
-EndIf
-If DCAPMValue<100 And warnuser=#True
-  MessageRequester("!!WARNING!!   DCAPMVALUE < 100   !!WARNING!!", help.s , #MB_OK|#MB_ICONINFORMATION) 
-EndIf
+CheckValues()
 
 If pdebug = #True
   OpenConsole()
@@ -502,6 +540,7 @@ If OpenWindow(0, 100, 100, 456, 302, "quietHDD Settings",#PB_Window_SystemMenu |
     Frame3DGadget(#Frame3D_1, 8, 200, 440, 92, "Manual APM Settings")
     TrackBarGadget(#tb_mAPMValue, 16, 216, 390, 30, 0, 255)
     TextGadget(#txt_mAPMValue, 408, 220, 30, 16, "0", #PB_Text_Right)
+    TextGadget(#txt_mAPMWarning, 16, 216+32, 390, 16, "")
     ButtonGadget(#bt_SetAPMValue, 248, 256, 186, 22, "Set APM Value")
     TrackBarGadget(#tb_ACValue, 16, 48, 390, 30, 0, 255)
     TextGadget(#Text_1, 16, 32, 220, 20, "AC Value (running on AC power)")
@@ -544,11 +583,11 @@ If OpenWindow(0, 100, 100, 456, 302, "quietHDD Settings",#PB_Window_SystemMenu |
   EndIf
   
   ; Set APM on startup
-  setataapm(APMValue)
-
-  If tray = #True
-    InfoText()
-    BlinkIcon()  
+  If GetSystemPowerStatus_(@PwrStat)=0
+    MessageRequester("Warning", "GetSystemPowerStatus() failed. Unable to determine AC/DC informations.", #PB_MessageRequester_Ok)
+  Else
+    PwrLastLineStatus = PwrStat\ACLineStatus
+    SmartSetAPM()  
   EndIf
   
   Minimized=#True : quit.l=#False
@@ -583,15 +622,15 @@ If OpenWindow(0, 100, 100, 456, 302, "quietHDD Settings",#PB_Window_SystemMenu |
             EndIf
           EndIf
         Case 4 ; Set HDD APM
-          setataapm(APMValue)
+          SmartSetAPM()
           
           If tray = 1
             InfoText()
             BlinkIcon()
           EndIf
         Case 5 ; About/Help
-          ;MessageRequester("About quietHDD", help.s , #MB_OK|#MB_ICONINFORMATION)  
-          AboutImageRequester(WindowID(0),  "About quietHDD", "Text1", help.s , ImageID(0))  
+          MessageRequester("About quietHDD", help.s , #MB_OK|#MB_ICONINFORMATION)  
+          ;AboutImageRequester(WindowID(0),  "About quietHDD", "Text1", help.s , ImageID(0))  
         Case 6 ; Quit
           quit=#True
       EndSelect
@@ -612,6 +651,11 @@ If OpenWindow(0, 100, 100, 456, 302, "quietHDD Settings",#PB_Window_SystemMenu |
         mAPMValue = GetGadgetState(#tb_mAPMValue)
         SetGadgetText(#txt_mAPMValue, Str(mAPMValue))
       ElseIf GadgetID = #bt_SetAPMValue
+        If GetGadgetState(#tb_mAPMValue)<100
+          SetGadgetText(#txt_mAPMWarning, "*** WARNING: Value less than 100 ***")
+        Else
+          SetGadgetText(#txt_mAPMWarning, "")
+        EndIf
         If setataapm(GetGadgetState(#tb_mAPMValue))=0
           
         EndIf
@@ -654,25 +698,25 @@ DataSection
   gicon: IncludeBinary "quiethd_gn.ico"
 EndDataSection
    
-; jaPBe Version=3.8.10.733
-; FoldLines=00EE01370139017C
-; Build=122
-; ProductName=eeeHDD
+; jaPBe Version=3.8.9.728
+; FoldLines=0103014C014E0191
+; Build=200
+; ProductName=quietHDD
 ; ProductVersion=1.0
-; FileDescription=eeeHDD diables the Automatic Power Management (APM) of the primary Harddrive and eliminates the annoying click sound that the Seagate HDD's produces
+; FileDescription=eeeHDD diables the Automatic Power Management (APM) of the primary Harddrive and eliminates the annoying click sound that the some HDD's produces when parking the head
 ; FileVersion=1.0 Build %build%
-; InternalName=eeeHDD
+; InternalName=quietHDD
 ; LegalCopyright=Freeware - This software comes with absolutely NO WARRANTY! Use it on your own risk!
-; OriginalFilename=eeeHDD.exe
+; OriginalFilename=quietHDD.exe
 ; EMail=joern.koerner@gmail.com
-; Web=http://sites.google.com/site/eeehddsite/
+; Web=http://sites.google.com/site/quiethdd/
 ; Language=0x0000 Language Neutral
-; FirstLine=413
-; CursorPosition=589
+; FirstLine=217
+; CursorPosition=233
 ; EnableADMINISTRATOR
 ; EnableXP
 ; UseIcon=quiethd.ico
 ; ExecutableFormat=Windows
-; Executable=C:\Dokumente und Einstellungen\injk\Eigene Dateien\Source\eeeHDD\trunk\eeeHDD.exe
+; Executable=C:\Dokumente und Einstellungen\injk\Eigene Dateien\Source\eeeHDD\trunk\quietHDD.exe
 ; DontSaveDeclare
 ; EOF
