@@ -525,11 +525,17 @@ Procedure RefreshValues()
 EndProcedure
 
 Procedure SmartSetValues()
-  ; Set APM on startup
-  setataapm(APMValue)
-  If tray = #True
-    InfoText()
-    BlinkIcon()
+  If GetSystemPowerStatus_(@PwrStat)=0
+    MessageRequester("Warning", "GetSystemPowerStatus() failed. Unable to determine AC/DC informations.", #PB_MessageRequester_Ok)
+  Else
+    If PwrStat\ACLineStatus <> PwrLastLineStatus
+      setataapm(APMValue)
+      setataaam(AAMValue)      
+      If tray = #True
+        InfoText()
+        BlinkIcon()
+      EndIf
+    EndIf
   EndIf
 EndProcedure
 
@@ -913,8 +919,8 @@ DataSection
 EndDataSection
    
 ; jaPBe Version=3.8.10.733
-; FoldLines=00F5010A010C01230125016E017001B301B501F8020E0215
-; Build=207
+; FoldLines=00F5010A010C01230125016E017001B301B501F8
+; Build=209
 ; ProductName=quietHDD
 ; ProductVersion=1.0
 ; FileDescription=quietHDD diables the Advanced Power Management (APM) of the primary Harddrive and eliminates the annoying click sound that the some HDD's produces when parking the head
@@ -925,8 +931,8 @@ EndDataSection
 ; EMail=joern.koerner@gmail.com
 ; Web=http://sites.google.com/site/quiethdd/
 ; Language=0x0000 Language Neutral
-; FirstLine=521
-; CursorPosition=816
+; FirstLine=264
+; CursorPosition=537
 ; EnableADMINISTRATOR
 ; EnableThread
 ; EnableXP
