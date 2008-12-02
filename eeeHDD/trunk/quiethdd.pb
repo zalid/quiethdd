@@ -508,8 +508,15 @@ Procedure RefreshValues()
   If GetSystemPowerStatus_(@PwrStat)=0
     MessageRequester("Warning", "GetSystemPowerStatus() failed. Unable to determine AC/DC informations.", #PB_MessageRequester_Ok)
   Else
-    If PwrStat\ACLineStatus <> PwrLastLineStatus
-      PwrLastLineStatus =  PwrStat\ACLineStatus
+    If pdebug=#True
+      PrintN("PwrStat\ACAAMValue: " + Str(PwrStat\ACLineStatus))
+      PrintN("PwrLastLineStatus : " + Str(PwrLastLineStatus))
+    EndIf
+      If PwrStat\ACLineStatus <> PwrLastLineStatus
+        If pdebug=#True
+          PrintN("Power Line status changed.")
+        EndIf
+        PwrLastLineStatus =  PwrStat\ACLineStatus
       If PwrStat\ACLineStatus = 0  ;Battery
         APMValue = DCAPMValue
         AAMValue = DCAAMValue
@@ -920,7 +927,7 @@ EndDataSection
    
 ; jaPBe Version=3.8.10.733
 ; FoldLines=00F5010A010C01230125016E017001B301B501F8
-; Build=211
+; Build=215
 ; ProductName=quietHDD
 ; ProductVersion=1.0
 ; FileDescription=quietHDD diables the Advanced Power Management (APM) of the primary Harddrive and eliminates the annoying click sound that the some HDD's produces when parking the head
@@ -931,8 +938,8 @@ EndDataSection
 ; EMail=joern.koerner@gmail.com
 ; Web=http://sites.google.com/site/quiethdd/
 ; Language=0x0000 Language Neutral
-; FirstLine=255
-; CursorPosition=536
+; FirstLine=239
+; CursorPosition=293
 ; EnableADMINISTRATOR
 ; EnableThread
 ; EnableXP
