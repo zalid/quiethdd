@@ -14,12 +14,13 @@
 #IOCTL_IDE_PASS_THROUGH     = $04D028
 #IOCTL_ATA_PASS_THROUGH     = $04D02C
 #HDIO_DRIVE_CMD             = $03F1   ; Taken from /usr/include/linux/hdreg.h
+#HDIO_SET_ACOUSTIC          = $032C
+#HDIO_GET_ACOUSTIC          = $030F
 #WIN_SETFEATURES            = $EF
 #SETFEATURES_EN_AAM         = $42
 #SETFEATURES_DIS_AAM        = $C2
 #SETFEATURES_EN_APM         = $05
 #SETFEATURES_DIS_APM        = $85
-
 #ATA_FLAGS_DRDY_REQUIRED    = $01
 #ATA_FLAGS_DATA_IN          = $02
 #ATA_FLAGS_DATA_OUT         = $04
@@ -365,6 +366,76 @@ Procedure setapm(APMValue.l)
   ; EndIf
 EndProcedure
 
+Procedure.l setataaam(AAMValue.l)
+  ; \\.\PhysicalDrive0
+  hDevice = CreateFile_( "\\.\PhysicalDrive0", #GENERIC_READ | #GENERIC_WRITE, #FILE_SHARE_READ | #FILE_SHARE_WRITE, 0, #OPEN_EXISTING, 0, 0)
+  If hDevice = #INVALID_HANDLE_VALUE
+    PrintN( "CreateFile failed.")
+    MessageRequester("Error", "Failed to open PhysicalDrive0. Ending now.",#PB_MessageRequester_Ok)
+    End
+  EndIf
+  
+  Define ab.ATA_PASS_THROUGH_EX_WITH_BUFFERS
+  ab\length             = SizeOf(ATA_PASS_THROUGH_EX)
+  ab\DataBufferOffset   = OffsetOf(ATA_PASS_THROUGH_EX_WITH_BUFFERS\ucDataBuf) 
+  ab\TimeOutValue       = 1 ; 10
+  dbsize.l              = SizeOf(ATA_PASS_THROUGH_EX_WITH_BUFFERS)
+  
+  ab\AtaFlags           = #ATA_FLAGS_DATA_IN
+  ab\DataTransferLength = 512  
+  ab\ucDataBuf[0]       = $CF   ; magic=0xcf
+  ab\CurrentTaskFile[#inCommandReg]     = #WIN_SETFEATURES
+  ab\CurrentTaskFile[#inFeaturesReg]    = #SETFEATURES_EN_AAM
+  
+  If AAMValue<128
+    AAMValue=128
+  EndIf
+  If AAMValue>254
+    APMValue=254
+    ab\CurrentTaskFile[#inFeaturesReg]    = #SETFEATURES_DIS_AAM
+    ab\CurrentTaskFile[#inSectorCountReg] = 0
+  Else
+    ab\CurrentTaskFile[#inSectorCountReg] = AAMValue
+  EndIf
+  
+  If pdebug=#True
+    PrintN(InfoText())
+    PrintN("AAMValue:            0x"+ZHex(AAMValue)+" "+Str(AAMValue))
+    PrintN("Input registers:")
+    PrintN("  inFeaturesReg      0x"+ZHex(ab\CurrentTaskFile[#inFeaturesReg]    )+"    inSectorCountReg  0x"+ZHex(ab\CurrentTaskFile[#inSectorCountReg]))
+    PrintN("  inSectorNumberReg  0x"+ZHex(ab\CurrentTaskFile[#inSectorNumberReg])+"    inCylLowReg       0x"+ZHex(ab\CurrentTaskFile[#inCylLowReg]))
+    PrintN("  inCylHighReg       0x"+ZHex(ab\CurrentTaskFile[#inCylHighReg]     )+"    inDriveHeadReg    0x"+ZHex(ab\CurrentTaskFile[#inDriveHeadReg]))
+    PrintN("  inCommandReg       0x"+ZHex(ab\CurrentTaskFile[#inCommandReg])) ;+"    inSectorCountReg 0x"+ZHex(ab\CurrentTaskFile[#inSectorCountReg]))
+  EndIf
+  
+  bytesRet.l = 0
+  retval = DeviceIoControl_( hDevice, #IOCTL_ATA_PASS_THROUGH, @ab, dbsize.l, @ab, dbsize.l, @bytesRet, #Null) 
+  If retval=0
+    MessageRequester("Error", "IOCTL_ATA_PASS_THROUGH failed. Reason:0x"+RSet(Hex(GetLastError_()), 8, "0")+Chr(13)+Chr(13)+"Run quietHDD with /DEBUG argument to get more information",#PB_MessageRequester_Ok)
+  EndIf
+  If pdebug=#True
+    PrintN("Output registers:")
+    PrintN("  outErrorReg        0x"+ZHex(ab\CurrentTaskFile[#outErrorReg]       )+"    outSectorCountReg 0x"+ZHex(ab\CurrentTaskFile[#outSectorCountReg]))
+    PrintN("  outSectorNumberReg 0x"+ZHex(ab\CurrentTaskFile[#outSectorNumberReg])+"    outCylLowReg      0x"+ZHex(ab\CurrentTaskFile[#outCylLowReg]))
+    PrintN("  outCylHighReg      0x"+ZHex(ab\CurrentTaskFile[#outCylHighReg]     )+"    outDriveHeadReg   0x"+ZHex(ab\CurrentTaskFile[#outDriveHeadReg]))
+    PrintN("  outStatusReg       0x"+ZHex(ab\CurrentTaskFile[#outStatusReg])) ;+"    inSectorCountReg 0x"+ZHex(ab\CurrentTaskFile[#inSectorCountReg]))
+    PrintN(CR)
+    If retval=0
+      PrintN("IOCTL_ATA_PASS_THROUGH failed. Reason:0x"+RSet(Hex(GetLastError_()), 8, "0"))
+    EndIf
+  EndIf
+  
+  If hDevice
+    CloseHandle_( hDevice )
+  EndIf
+  If retval=0
+    ProcedureReturn -1
+  Else
+    ProcedureReturn 0
+  EndIf
+EndProcedure
+
+
 Procedure.l setataapm(APMValue.l)
   ; \\.\PhysicalDrive0
   hDevice = CreateFile_( "\\.\PhysicalDrive0", #GENERIC_READ | #GENERIC_WRITE, #FILE_SHARE_READ | #FILE_SHARE_WRITE, 0, #OPEN_EXISTING, 0, 0)
@@ -467,6 +538,7 @@ Procedure WinCallback(hwnd, msg, wParam, lParam)
             APMValue = DCAPMValue
             AAMValue = DCAAMValue
             SmartSetAPM()
+            
           ElseIf PwrStat\ACLineStatus = 1 ;AC Power
             APMValue = ACAPMValue
             AAMValue = ACAAMValue
@@ -782,6 +854,10 @@ If OpenWindow(0, 100, 100, 472, 300, "quietHDD Settings",#PB_Window_SystemMenu |
         If setataapm(GetGadgetState(#tb_mAPMValue))=0
           
         EndIf
+      ElseIf GadgetID = #bt_SetAAMValue
+        If setataapm(GetGadgetState(#tb_mAAMValue))=0
+          
+        EndIf
       ElseIf GadgetID = #tb_ACAPMValue
         ACValue = GetGadgetState(#tb_ACAPMValue)
         SetGadgetText(#txt_ACAPMValue, Str(ACValue))
@@ -830,8 +906,8 @@ DataSection
 EndDataSection
    
 ; jaPBe Version=3.8.10.733
-; FoldLines=00F40109010B01220124016D016F01B201B401BB
-; Build=199
+; FoldLines=00F5010A010C01230125016E
+; Build=200
 ; ProductName=quietHDD
 ; ProductVersion=1.0
 ; FileDescription=quietHDD diables the Advanced Power Management (APM) of the primary Harddrive and eliminates the annoying click sound that the some HDD's produces when parking the head
@@ -842,13 +918,13 @@ EndDataSection
 ; EMail=joern.koerner@gmail.com
 ; Web=http://sites.google.com/site/quiethdd/
 ; Language=0x0000 Language Neutral
-; FirstLine=573
-; CursorPosition=781
+; FirstLine=721
+; CursorPosition=859
 ; EnableADMINISTRATOR
 ; EnableThread
 ; EnableXP
 ; UseIcon=quiethdd.ico
 ; ExecutableFormat=Windows
-; Executable=C:\Dokumente und Einstellungen\injk\Eigene Dateien\Source\eeeHDD\trunk\quietHDD.exe
+; Executable=C:\Users\injk\eeeHDD\trunk\quietHDD.exe
 ; DontSaveDeclare
 ; EOF
