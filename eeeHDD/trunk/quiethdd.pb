@@ -558,10 +558,16 @@ Procedure WinCallback(hwnd, msg, wParam, lParam)
       EndIf  
     Case #PBT_APMRESUMEAUTOMATIC
       ;MessageRequester("Information", "Resume from Suspend", #PB_MessageRequester_Ok)#
+      If pdebug = #True
+        PrintN("msg: PBT_APMRESUMEAUTOMATIC")
+      EndIf
       RefreshValues()
       SmartSetValues()
     Case #PBT_APMPOWERSTATUSCHANGE  ; System Power Status has changed.
       ;Now we've to find out what happened.
+      If pdebug = #True
+        PrintN("msg: PBT_APMPOWERSTATUSCHANGE")
+      EndIf
       RefreshValues()
       SmartSetValues()
     EndSelect
@@ -789,7 +795,6 @@ If OpenWindow(0, 100, 100, 472, 300, "quietHDD Settings",#PB_Window_SystemMenu |
     MessageRequester("Warning", "GetSystemPowerStatus() failed. Unable to determine AC/DC informations.", #PB_MessageRequester_Ok)
   Else
     PwrLastLineStatus = PwrStat\ACLineStatus
-    RefreshValues()
     SmartSetValues()  
   EndIf
   
@@ -827,7 +832,7 @@ If OpenWindow(0, 100, 100, 472, 300, "quietHDD Settings",#PB_Window_SystemMenu |
         Case 4 ; Set HDD APM
           SmartSetValues()
           
-          If tray = 1
+          If tray = #True
             InfoText()
             BlinkIcon()
           EndIf
@@ -927,7 +932,7 @@ EndDataSection
    
 ; jaPBe Version=3.8.10.733
 ; FoldLines=00F5010A010C01230125016E017001B301B501F8
-; Build=215
+; Build=217
 ; ProductName=quietHDD
 ; ProductVersion=1.0
 ; FileDescription=quietHDD diables the Advanced Power Management (APM) of the primary Harddrive and eliminates the annoying click sound that the some HDD's produces when parking the head
@@ -938,8 +943,8 @@ EndDataSection
 ; EMail=joern.koerner@gmail.com
 ; Web=http://sites.google.com/site/quiethdd/
 ; Language=0x0000 Language Neutral
-; FirstLine=239
-; CursorPosition=293
+; FirstLine=308
+; CursorPosition=580
 ; EnableADMINISTRATOR
 ; EnableThread
 ; EnableXP
