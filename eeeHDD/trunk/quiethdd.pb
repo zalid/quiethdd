@@ -391,7 +391,7 @@ Procedure.l setataaam(AAMValue.l)
     AAMValue=128
   EndIf
   If AAMValue>254
-    APMValue=254
+    AAMValue=254
     ab\CurrentTaskFile[#inFeaturesReg]    = #SETFEATURES_DIS_AAM
     ab\CurrentTaskFile[#inSectorCountReg] = 0
   Else
@@ -434,7 +434,6 @@ Procedure.l setataaam(AAMValue.l)
     ProcedureReturn 0
   EndIf
 EndProcedure
-
 
 Procedure.l setataapm(APMValue.l)
   ; \\.\PhysicalDrive0
@@ -505,7 +504,27 @@ Procedure.l setataapm(APMValue.l)
   EndIf
 EndProcedure
 
-Procedure SmartSetAPM()
+Procedure RefreshValues()
+  If GetSystemPowerStatus_(@PwrStat)=0
+    MessageRequester("Warning", "GetSystemPowerStatus() failed. Unable to determine AC/DC informations.", #PB_MessageRequester_Ok)
+  Else
+    If PwrStat\ACLineStatus <> PwrLastLineStatus
+      PwrLastLineStatus =  PwrStat\ACLineStatus
+      If PwrStat\ACLineStatus = 0  ;Battery
+        APMValue = DCAPMValue
+        AAMValue = DCAAMValue
+      ElseIf PwrStat\ACLineStatus = 1 ;AC Power
+        APMValue = ACAPMValue
+        AAMValue = ACAAMValue
+      Else
+        ;Unknown power status
+        InfoText("Unknown Power Status")
+      EndIf
+    EndIf
+  EndIf
+EndProcedure
+
+Procedure SmartSetValues()
   ; Set APM on startup
   setataapm(APMValue)
   If tray = #True
@@ -526,35 +545,18 @@ Procedure WinCallback(hwnd, msg, wParam, lParam)
       EndIf  
     Case #PBT_APMRESUMEAUTOMATIC
       ;MessageRequester("Information", "Resume from Suspend", #PB_MessageRequester_Ok)#
-      SmartSetAPM()
+      RefreshValues()
+      SmartSetValues()
     Case #PBT_APMPOWERSTATUSCHANGE  ; System Power Status has changed.
       ;Now we've to find out what happened.
-      If GetSystemPowerStatus_(@PwrStat)=0
-        MessageRequester("Warning", "GetSystemPowerStatus() failed. Unable to determine AC/DC informations.", #PB_MessageRequester_Ok)
-      Else
-        If PwrStat\ACLineStatus <> PwrLastLineStatus
-          PwrLastLineStatus =  PwrStat\ACLineStatus
-          If PwrStat\ACLineStatus = 0  ;Battery
-            APMValue = DCAPMValue
-            AAMValue = DCAAMValue
-            SmartSetAPM()
-            
-          ElseIf PwrStat\ACLineStatus = 1 ;AC Power
-            APMValue = ACAPMValue
-            AAMValue = ACAAMValue
-            SmartSetAPM()
-          Else
-            ;Unknown power status
-            InfoText("Unknown Power Status")
-            BlinkIcon()
-          EndIf
-        EndIf
-      EndIf
-      EndSelect
+      RefreshValues()
+      SmartSetValues()
+    EndSelect
     
   EndIf
   ProcedureReturn result
 EndProcedure
+
 
 ReadSettings()
 
@@ -609,7 +611,7 @@ If pcount >0
       CloseConsole()
       End
     EndIf
-    ;- SETAAM TODO
+    ;- SETAAM 
     If FindString(parm,"/SETAAM:",0)
       v.s = StringField(parm,2,":")
       av = Val(v)
@@ -622,9 +624,9 @@ If pcount >0
       AAMValue = av 
       OpenConsole()
       PrintN("quietHDD Build:" + Str(#jaPBe_ExecuteBuild)+CR+CR)
-      PrintN("SETAAM: Setting to "+Str(APMValue))
+      PrintN("SETAAM: Setting to "+Str(AAMValue))
   
-      If setataapm(APMValue)=0
+      If setataaam(AAMValue)=0
         PrintN("Ok.")
       Else
         PrintN("Failed.")
@@ -657,7 +659,7 @@ If pcount >0
       EndIf
       DCAPMValue = av 
     EndIf
-    ;- AAM Values TODO
+    ;- AAM Values 
     If FindString(parm,"/ACAAMVALUE:",0)
       v.s = StringField(parm,2,":")
       av = Val(v)
@@ -774,7 +776,8 @@ If OpenWindow(0, 100, 100, 472, 300, "quietHDD Settings",#PB_Window_SystemMenu |
     MessageRequester("Warning", "GetSystemPowerStatus() failed. Unable to determine AC/DC informations.", #PB_MessageRequester_Ok)
   Else
     PwrLastLineStatus = PwrStat\ACLineStatus
-    SmartSetAPM()  
+    RefreshValues()
+    SmartSetValues()  
   EndIf
   
   Minimized=#True : quit.l=#False
@@ -809,7 +812,7 @@ If OpenWindow(0, 100, 100, 472, 300, "quietHDD Settings",#PB_Window_SystemMenu |
             EndIf
           EndIf
         Case 4 ; Set HDD APM
-          SmartSetAPM()
+          SmartSetValues()
           
           If tray = 1
             InfoText()
@@ -855,7 +858,7 @@ If OpenWindow(0, 100, 100, 472, 300, "quietHDD Settings",#PB_Window_SystemMenu |
           
         EndIf
       ElseIf GadgetID = #bt_SetAAMValue
-        If setataapm(GetGadgetState(#tb_mAAMValue))=0
+        If setataaam(GetGadgetState(#tb_mAAMValue))=0
           
         EndIf
       ElseIf GadgetID = #tb_ACAPMValue
@@ -876,12 +879,16 @@ If OpenWindow(0, 100, 100, 472, 300, "quietHDD Settings",#PB_Window_SystemMenu |
         ACAAMValue = GetGadgetState(#tb_ACAAMValue)
         DCAAMValue = GetGadgetState(#tb_DCAAMValue)
         WriteSettings()
+        RefreshValues()
+        SmartSetValues()
       ElseIf GadgetID = #bt_Ok  ; Write, Apply, CloseWin
         ACAPMValue = GetGadgetState(#tb_ACAPMValue)
         DCAPMValue = GetGadgetState(#tb_DCAPMValue)
         ACAAMValue = GetGadgetState(#tb_ACAAMValue)
         DCAAMValue = GetGadgetState(#tb_DCAAMValue)
         WriteSettings()
+        RefreshValues()
+        SmartSetValues()
         ShowWindow_(WindowID(0),#SW_HIDE)
         Minimized=#True
       ElseIf GadgetID = #bt_Cancel
@@ -906,8 +913,8 @@ DataSection
 EndDataSection
    
 ; jaPBe Version=3.8.10.733
-; FoldLines=00F5010A010C01230125016E
-; Build=200
+; FoldLines=00F5010A010C01230125016E017001B301B501F8020E0215
+; Build=207
 ; ProductName=quietHDD
 ; ProductVersion=1.0
 ; FileDescription=quietHDD diables the Advanced Power Management (APM) of the primary Harddrive and eliminates the annoying click sound that the some HDD's produces when parking the head
@@ -918,8 +925,8 @@ EndDataSection
 ; EMail=joern.koerner@gmail.com
 ; Web=http://sites.google.com/site/quiethdd/
 ; Language=0x0000 Language Neutral
-; FirstLine=721
-; CursorPosition=859
+; FirstLine=521
+; CursorPosition=816
 ; EnableADMINISTRATOR
 ; EnableThread
 ; EnableXP
