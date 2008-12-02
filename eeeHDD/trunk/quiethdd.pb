@@ -566,7 +566,7 @@ Procedure WinCallback(hwnd, msg, wParam, lParam)
     Case #PBT_APMPOWERSTATUSCHANGE  ; System Power Status has changed.
       ;Now we've to find out what happened.
       If pdebug = #True
-        PrintN("msg: PBT_APMPOWERSTATUSCHANGE")
+        PrintN("msg: PBT_APMPOWERSTATUSCHANGE  wParam=0x" + Hex(wParam))
       EndIf
       RefreshValues()
       SmartSetValues()
@@ -932,7 +932,7 @@ EndDataSection
    
 ; jaPBe Version=3.8.10.733
 ; FoldLines=00F5010A010C01230125016E017001B301B501F8
-; Build=217
+; Build=218
 ; ProductName=quietHDD
 ; ProductVersion=1.0
 ; FileDescription=quietHDD diables the Advanced Power Management (APM) of the primary Harddrive and eliminates the annoying click sound that the some HDD's produces when parking the head
@@ -943,8 +943,8 @@ EndDataSection
 ; EMail=joern.koerner@gmail.com
 ; Web=http://sites.google.com/site/quiethdd/
 ; Language=0x0000 Language Neutral
-; FirstLine=308
-; CursorPosition=580
+; FirstLine=291
+; CursorPosition=568
 ; EnableADMINISTRATOR
 ; EnableThread
 ; EnableXP
