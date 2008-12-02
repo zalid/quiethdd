@@ -138,7 +138,7 @@ Structure ATA_PASS_THROUGH_EX_WITH_BUFFERS
   ucDataBuf.c[512]
 EndStructure
 
-Global DisableSuspend = 0
+Global DisableSuspend = 0, blink=#False
 Global pdebug=#False, tray=#True, warnuser=#True, help.s
 Global APMValue.l=255, ACAPMValue.l=255, DCAPMValue.l=255
 Global PwrStat.SYSTEM_POWER_STATUS, PwrLastLineStatus.b
@@ -180,12 +180,19 @@ EndProcedure
 
 
 Procedure BlinkIcon()
-  For i = 1 To 5
-    ChangeSysTrayIcon(0, ImageID(1))
-    Delay(300)
-    ChangeSysTrayIcon(0, ImageID(0))
-    Delay(300)
-  Next i
+  If tray=#True
+    Repeat
+      If blink=#True 
+        For i = 1 To 5
+          ChangeSysTrayIcon(0, ImageID(1))
+          Delay(300)
+          ChangeSysTrayIcon(0, ImageID(0))
+          Delay(300)
+        Next i
+        blink = #False
+      EndIf
+    ForEver
+  EndIf
 EndProcedure
 
 Procedure.s InfoText(text.s="")
@@ -581,6 +588,8 @@ If OpenWindow(0, 100, 100, 456, 302, "quietHDD Settings",#PB_Window_SystemMenu |
     AddSysTrayIcon(0, WindowID(0), ImageID(0))
     SysTrayIconToolTip (0, "quietHDD"+Chr(13)+"Build: " + Str(#jaPBe_ExecuteBuild) + Chr(13) + "APMValue: "+Str(APMValue))
   EndIf
+
+  CreateThread(@BlinkIcon(), 0)
   
   ; Set APM on startup
   If GetSystemPowerStatus_(@PwrStat)=0
@@ -694,16 +703,16 @@ End
 
 
 DataSection
-  nicon: IncludeBinary "quiethd.ico"
-  gicon: IncludeBinary "quiethd_gn.ico"
+  nicon: IncludeBinary "quiethdd.ico"
+  gicon: IncludeBinary "quiethdd_gn.ico"
 EndDataSection
    
-; jaPBe Version=3.8.9.728
-; FoldLines=0103014C014E0191
-; Build=200
+; jaPBe Version=3.8.10.733
+; FoldLines=010A015301550198
+; Build=199
 ; ProductName=quietHDD
 ; ProductVersion=1.0
-; FileDescription=eeeHDD diables the Automatic Power Management (APM) of the primary Harddrive and eliminates the annoying click sound that the some HDD's produces when parking the head
+; FileDescription=quietHDD diables the Advanced Power Management (APM) of the primary Harddrive and eliminates the annoying click sound that the some HDD's produces when parking the head
 ; FileVersion=1.0 Build %build%
 ; InternalName=quietHDD
 ; LegalCopyright=Freeware - This software comes with absolutely NO WARRANTY! Use it on your own risk!
@@ -711,11 +720,11 @@ EndDataSection
 ; EMail=joern.koerner@gmail.com
 ; Web=http://sites.google.com/site/quiethdd/
 ; Language=0x0000 Language Neutral
-; FirstLine=217
-; CursorPosition=233
+; FirstLine=522
+; CursorPosition=704
 ; EnableADMINISTRATOR
 ; EnableXP
-; UseIcon=quiethd.ico
+; UseIcon=quiethdd.ico
 ; ExecutableFormat=Windows
 ; Executable=C:\Dokumente und Einstellungen\injk\Eigene Dateien\Source\eeeHDD\trunk\quietHDD.exe
 ; DontSaveDeclare
