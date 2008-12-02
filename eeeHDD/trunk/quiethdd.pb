@@ -64,21 +64,34 @@ EndEnumeration
 ;- Gadget Constants
 ;
 Enumeration
+  #bt_Ok
+  #bt_Apply
+  #bt_Cancel
+  #Panel_0
   #Frame3D_0
+  #tb_ACAPMValue
+  #Text_1
+  #tb_DCAPMValue
+  #Text_3
+  #txt_ACAPMValue
+  #txt_DCAPMValue
+  #Frame3D_2
+  #tb_ACAAMValue
+  #Text_7
+  #tb_DCAAMValue
+  #Text_9
+  #txt_ACAAMValue
+  #txt_DCAAMValue
   #Frame3D_1
   #tb_mAPMValue
-  #txt_mAPMValue
+  #Text_20
   #bt_SetAPMValue
-  #tb_ACValue
-  #Text_1
-  #Text_3
-  #tb_DCValue
-  #txt_ACValue
-  #txt_DCValue
-  #bt_Apply
-  #bt_Ok
-  #bt_Cancel
-  #txt_mAPMWarning
+  #txt_mAPMValue
+  #tb_mAAMValue
+  #Text_22
+  #txt_mAAMValue
+  #bt_SetAAMValue
+  #ed_About
 EndEnumeration
 
 
@@ -138,14 +151,15 @@ Structure ATA_PASS_THROUGH_EX_WITH_BUFFERS
   ucDataBuf.c[512]
 EndStructure
 
-Global DisableSuspend = 0, blink=#False
+Global DisableSuspend = 0
 Global pdebug=#False, tray=#True, warnuser=#True, help.s
 Global APMValue.l=255, ACAPMValue.l=255, DCAPMValue.l=255
+Global AAMValue.l=254, ACAAMValue.l=254, DCAAMValue.l=128
 Global PwrStat.SYSTEM_POWER_STATUS, PwrLastLineStatus.b
 
 help.s =          "quietHDD Build:" + Str(#jaPBe_ExecuteBuild)+CR+CR
 help.s = help.s + "Homepage http://sites.google.com/site/quiethdd/"+CR+CR
-help.s = help.s + "quietHDD disables/modifies the harddrives APM feature setting"+CR
+help.s = help.s + "quietHDD disables/modifies the harddrives APM and AAM feature setting"+CR
 help.s = help.s + "Modifying APM value also controls HDD's spindown rate. Do not let your HDD"+CR
 help.s = help.s + "spindown/spinup too often when you set small values (less 128) as it may"+CR
 help.s = help.s + "shortens then life of your HDD!  You have been warned!"+CR+CR
@@ -161,9 +175,18 @@ help.s = help.s + "                 255 disables APM, 128 is factory default"+CR
 help.s = help.s + "                 Defaults to 255 when not explicit set."+CR
 help.s = help.s + "  /DCAPMVALUE:n  APM Value to set when running on Battery power"+CR
 help.s = help.s + "                 Defaults to 255 when not explicit set."+CR
+help.s = help.s + "  /ACAAMVALUE:n  AAM Value to set when running on AC Power"+CR
+help.s = help.s + "                 Valid values are in range between 128-254"+CR
+help.s = help.s + "                 Where 128 is most quiet and 254 fastest."+CR
+help.s = help.s + "                 Defaults to 254 when not explicit set."+CR
+help.s = help.s + "  /DCAAMVALUE:n  AAM Value to set when running on Battery power"+CR
+help.s = help.s + "                 Defaults to 255 when not explicit set."+CR
 help.s = help.s + "  /SETAPM:n      Set the HDD APM level to this value and exit quietHDD"+CR
 help.s = help.s + "                 This option is useful to find out the best APM level for your"+CR
 help.s = help.s + "                 drive. Best to be used from console!"+CR
+help.s = help.s + "  /SETAAM:n      Set the HDD AAM level to this value and exit quietHDD"+CR
+help.s = help.s + "                 This option is useful to find out the best AAM level for your"+CR
+help.s = help.s + "                 drive."+CR
 help.s = help.s + "  /NOWARN        Do not display a warning on APM values < 100"+CR+CR
 
 
@@ -181,17 +204,12 @@ EndProcedure
 
 Procedure BlinkIcon()
   If tray=#True
-    Repeat
-      If blink=#True 
-        For i = 1 To 5
-          ChangeSysTrayIcon(0, ImageID(1))
-          Delay(300)
-          ChangeSysTrayIcon(0, ImageID(0))
-          Delay(300)
-        Next i
-        blink = #False
-      EndIf
-    ForEver
+    For i = 1 To 5
+      ChangeSysTrayIcon(0, ImageID(1))
+      Delay(300)
+      ChangeSysTrayIcon(0, ImageID(0))
+      Delay(300)
+    Next i
   EndIf
 EndProcedure
 
@@ -204,13 +222,13 @@ Procedure.s InfoText(text.s="")
     Else
       prefix.s = ""
     EndIf
-    txt.s = prefix + "APM value "+Str(APMValue)+" last set on "+FormatDate("%YYYY-%MM-%DD %HH:%II:%SS", Date())
+    txt.s = prefix + "APM:"+Str(APMValue)+" AAM:"+Str(AAMValue)+" last set on "+FormatDate("%YYYY-%MM-%DD %HH:%II:%SS", Date())
   Else
     txt.s = text.s 
   EndIf
   If tray=#True
     SetMenuItemText(0, 1, txt)
-    SysTrayIconToolTip (0, "quietHDD"+Chr(13)+"Build: " + Str(#jaPBe_ExecuteBuild) + Chr(13) + prefix + "APMValue: "+Str(APMValue))
+    SysTrayIconToolTip (0, "quietHDD"+Chr(13)+"Build: " + Str(#jaPBe_ExecuteBuild) + Chr(13) + prefix + "APMValue: "+Str(APMValue) + Chr(13) + prefix + "AAMValue: " + Str(AAMValue))
   EndIf
   ProcedureReturn txt
 EndProcedure
@@ -229,11 +247,15 @@ Procedure ReadSettings()
   If OpenPreferences("quietHDD.ini")
     ACAPMValue = ReadPreferenceLong("AC_APM_Value", ACAPMValue)
     DCAPMValue = ReadPreferenceLong("DC_APM_Value", DCAPMValue)
+    ACAAMValue = ReadPreferenceLong("AC_AAM_Value", ACAAMValue)
+    DCAAMValue = ReadPreferenceLong("DC_AAM_Value", DCAAMValue)
   Else
     ; Open failed. Try to create a new one
     If CreatePreferences("quietHDD.ini")
       WritePreferenceLong("AC_APM_Value", ACAPMValue)
       WritePreferenceLong("DC_APM_Value", DCAPMValue)
+      WritePreferenceLong("AC_AAM_Value", ACAAMValue)
+      WritePreferenceLong("DC_AAM_Value", DCAAMValue)
       
     Else
       ; Create failed. Inform the user
@@ -250,11 +272,15 @@ Procedure WriteSettings()
   If OpenPreferences("quietHDD.ini")
     WritePreferenceLong("AC_APM_Value", ACAPMValue)
     WritePreferenceLong("DC_APM_Value", DCAPMValue)
+    WritePreferenceLong("AC_AAM_Value", ACAAMValue)
+    WritePreferenceLong("DC_AAM_Value", DCAAMValue)
   Else
     ; Open failed. Try to create a new one
     If CreatePreferences("quietHDD.ini")
       WritePreferenceLong("AC_APM_Value", ACAPMValue)
       WritePreferenceLong("DC_APM_Value", DCAPMValue)
+      WritePreferenceLong("AC_AAM_Value", ACAAMValue)
+      WritePreferenceLong("DC_AAM_Value", DCAAMValue)
       
     Else
       ; Create failed. Inform the user
@@ -413,7 +439,7 @@ Procedure SmartSetAPM()
   setataapm(APMValue)
   If tray = #True
     InfoText()
-    BlinkIcon()  
+    BlinkIcon()
   EndIf
 EndProcedure
 
@@ -439,9 +465,11 @@ Procedure WinCallback(hwnd, msg, wParam, lParam)
           PwrLastLineStatus =  PwrStat\ACLineStatus
           If PwrStat\ACLineStatus = 0  ;Battery
             APMValue = DCAPMValue
+            AAMValue = DCAAMValue
             SmartSetAPM()
           ElseIf PwrStat\ACLineStatus = 1 ;AC Power
             APMValue = ACAPMValue
+            AAMValue = ACAAMValue
             SmartSetAPM()
           Else
             ;Unknown power status
@@ -480,6 +508,7 @@ If pcount >0
     If parm = "/NOWARN"
       warnuser=#False
     EndIf
+    ;- SETAPM
     If FindString(parm,"/SETAPM:",0)
       v.s = StringField(parm,2,":")
       av = Val(v)
@@ -508,6 +537,32 @@ If pcount >0
       CloseConsole()
       End
     EndIf
+    ;- SETAAM TODO
+    If FindString(parm,"/SETAAM:",0)
+      v.s = StringField(parm,2,":")
+      av = Val(v)
+      If av <128
+        av=128
+      EndIf
+      If av>254
+        av=254
+      EndIf
+      AAMValue = av 
+      OpenConsole()
+      PrintN("quietHDD Build:" + Str(#jaPBe_ExecuteBuild)+CR+CR)
+      PrintN("SETAAM: Setting to "+Str(APMValue))
+  
+      If setataapm(APMValue)=0
+        PrintN("Ok.")
+      Else
+        PrintN("Failed.")
+      EndIf
+      PrintN("-- PRESS RETURN --")
+      Input()
+      CloseConsole()
+      End
+    EndIf
+    ;- APM Values
     If FindString(parm,"/ACAPMVALUE:",0)
       v.s = StringField(parm,2,":")
       av = Val(v)
@@ -530,6 +585,29 @@ If pcount >0
       EndIf
       DCAPMValue = av 
     EndIf
+    ;- AAM Values TODO
+    If FindString(parm,"/ACAAMVALUE:",0)
+      v.s = StringField(parm,2,":")
+      av = Val(v)
+      If av <128
+        av=128
+      EndIf
+      If av>254
+        av=254
+      EndIf
+      ACAAMValue = av 
+    EndIf
+    If FindString(parm,"/DCAAMVALUE:",0)
+      v.s = StringField(parm,2,":")
+      av = Val(v)
+      If av <128
+        av=128
+      EndIf
+      If av>254
+        av=254
+      EndIf
+      DCAAMValue = av 
+    EndIf
   Next
 EndIf
 
@@ -540,31 +618,60 @@ If pdebug = #True
   PrintN("quietHDD: Debug is turned on."+CR)
 EndIf
 
-If OpenWindow(0, 100, 100, 456, 302, "quietHDD Settings",#PB_Window_SystemMenu |  #PB_Window_Invisible) ;#PB_Window_MinimizeGadget | #PB_Window_MaximizeGadget |
+If OpenWindow(0, 100, 100, 472, 300, "quietHDD Settings",#PB_Window_SystemMenu |  #PB_Window_Invisible) ;#PB_Window_MinimizeGadget | #PB_Window_MaximizeGadget |
   
   If CreateGadgetList(WindowID(#Window_0))
-    Frame3DGadget(#Frame3D_0, 8, 8, 440, 178, "AC and DC Settings")
-    Frame3DGadget(#Frame3D_1, 8, 200, 440, 92, "Manual APM Settings")
-    TrackBarGadget(#tb_mAPMValue, 16, 216, 390, 30, 0, 255)
-    TextGadget(#txt_mAPMValue, 408, 220, 30, 16, "0", #PB_Text_Right)
-    TextGadget(#txt_mAPMWarning, 16, 216+32, 390, 16, "")
-    ButtonGadget(#bt_SetAPMValue, 248, 256, 186, 22, "Set APM Value")
-    TrackBarGadget(#tb_ACValue, 16, 48, 390, 30, 0, 255)
-    TextGadget(#Text_1, 16, 32, 220, 20, "AC Value (running on AC power)")
-    TextGadget(#Text_3, 16, 96, 220, 20, "DC Value (running on battery)")
-    TrackBarGadget(#tb_DCValue, 16, 112, 390, 30, 0, 255)
-    TextGadget(#txt_ACValue, 410, 52, 30, 20, "0", #PB_Text_Right)
-    TextGadget(#txt_DCValue, 408, 115, 30, 20, "0", #PB_Text_Right)
-    ButtonGadget(#bt_Apply, 344, 152, 90, 22, "Apply")
-    ButtonGadget(#bt_Ok, 152, 152, 90, 22, "Ok")
-    ButtonGadget(#bt_Cancel, 248, 152, 90, 22, "Cancel")
+    ButtonGadget(#bt_Ok, 184, 272, 90, 22, "Ok")
+    ButtonGadget(#bt_Apply, 376, 272, 90, 22, "Apply")
+    ButtonGadget(#bt_Cancel, 280, 272, 90, 22, "Cancel")
     
-    SetGadgetState(#tb_ACValue, ACAPMValue)
-    SetGadgetState(#tb_DCValue, DCAPMValue)
-    SetGadgetText(#txt_ACValue, Str(ACAPMValue))
-    SetGadgetText(#txt_DCValue, Str(DCAPMValue))
+    ;- Panel0
+    PanelGadget(#Panel_0, 8, 8, 456, 256)
+      AddGadgetItem(#Panel_0, -1, "APM Settings")
+      Frame3DGadget(#Frame3D_0, 6, 10, 440, 210, "APM - AC and DC Advanced Power Management Settings")
+      TrackBarGadget(#tb_ACAPMValue, 14, 50, 392, 30, 0, 255)
+      TextGadget(#Text_1, 14, 34, 220, 20, "AC Value (running on AC power)")
+      TrackBarGadget(#tb_DCAPMValue, 14, 106, 392, 30, 0, 255)
+      TextGadget(#Text_3, 14, 90, 220, 16, "DC Value (running on battery)")
+      TextGadget(#txt_ACAPMValue, 414, 53, 24, 16, "123", #PB_Text_Right)
+      TextGadget(#txt_DCAPMValue, 414, 109, 24, 16, "123", #PB_Text_Right)
+      AddGadgetItem(#Panel_0, -1, "AAM Settings")
+      Frame3DGadget(#Frame3D_2, 6, 10, 440, 210, "AAM - AC and DC Automatic Acoustic Management")
+      TrackBarGadget(#tb_ACAAMValue, 14, 50, 392, 32, 128, 254)
+      TextGadget(#Text_7, 14, 34, 384, 16, "AC Value (running on AC power)")
+      TrackBarGadget(#tb_DCAAMValue, 14, 106, 392, 32, 128, 254)
+      TextGadget(#Text_9, 14, 90, 384, 16, "DC Value (running on battery)")
+      TextGadget(#txt_ACAAMValue, 414, 53, 24, 16, "123", #PB_Text_Right)
+      TextGadget(#txt_DCAAMValue, 414, 109, 24, 16, "123", #PB_Text_Right)
+      AddGadgetItem(#Panel_0, -1, "Manual Settings for testing")
+      Frame3DGadget(#Frame3D_1, 6, 10, 440, 210, "Manual APM and AAM Settings")
+      TrackBarGadget(#tb_mAPMValue, 14, 50, 392, 32, 0, 255)
+      TextGadget(#Text_20, 14, 34, 384, 16, "APM Value (0=most active - 255 disabled)")
+      ButtonGadget(#bt_SetAPMValue, 22, 90, 370, 22, "Set APM Value")
+      TextGadget(#txt_mAPMValue, 414, 53, 24, 16, "123", #PB_Text_Right)
+      TrackBarGadget(#tb_mAAMValue, 14, 146, 392, 32, 128, 254)
+      TextGadget(#Text_22, 14, 130, 384, 16, "AAM Value (128=quiet - 254=fast)")
+      TextGadget(#txt_mAAMValue, 414, 149, 24, 16, "123", #PB_Text_Right)
+      ButtonGadget(#bt_SetAAMValue, 22, 186, 370, 22, "Set AAM Vlaue")
+      AddGadgetItem(#Panel_0, -1, "Misc Settings")
+      AddGadgetItem(#Panel_0, -1, "About")
+      EditorGadget(#ed_About, 6, 2, 440, 224, #PB_Editor_ReadOnly)
+      SetGadgetText(#ed_About, help.s)
+    CloseGadgetList()
+    
+    SetGadgetState(#tb_ACAPMValue, ACAPMValue)
+    SetGadgetState(#tb_DCAPMValue, DCAPMValue)
+    SetGadgetText(#txt_ACAPMValue, Str(ACAPMValue))
+    SetGadgetText(#txt_DCAPMValue, Str(DCAPMValue))
     SetGadgetState(#tb_mAPMValue, 128)
     SetGadgetText(#txt_mAPMValue, Str(128))
+
+    SetGadgetState(#tb_ACAAMValue, ACAAMValue)
+    SetGadgetState(#tb_DCAAMValue, DCAAMValue)
+    SetGadgetText(#txt_ACAAMValue, Str(ACAAMValue))
+    SetGadgetText(#txt_DCAAMValue, Str(DCAAMValue))
+    SetGadgetState(#tb_mAAMValue, 128)
+    SetGadgetText(#txt_mAAMValue, Str(128))
   EndIf
   
   SetWindowCallback(@WinCallback())
@@ -589,7 +696,6 @@ If OpenWindow(0, 100, 100, 456, 302, "quietHDD Settings",#PB_Window_SystemMenu |
     SysTrayIconToolTip (0, "quietHDD"+Chr(13)+"Build: " + Str(#jaPBe_ExecuteBuild) + Chr(13) + "APMValue: "+Str(APMValue))
   EndIf
 
-  CreateThread(@BlinkIcon(), 0)
   
   ; Set APM on startup
   If GetSystemPowerStatus_(@PwrStat)=0
@@ -638,7 +744,10 @@ If OpenWindow(0, 100, 100, 456, 302, "quietHDD Settings",#PB_Window_SystemMenu |
             BlinkIcon()
           EndIf
         Case 5 ; About/Help
-          MessageRequester("About quietHDD", help.s , #MB_OK|#MB_ICONINFORMATION)  
+          ShowWindow_(WindowID(0),#SW_SHOW)
+          Minimized=#False
+          SetActiveGadget(#ed_About)
+          ;MessageRequester("About quietHDD", help.s , #MB_OK|#MB_ICONINFORMATION)  
           ;AboutImageRequester(WindowID(0),  "About quietHDD", "Text1", help.s , ImageID(0))  
         Case 6 ; Quit
           quit=#True
@@ -659,30 +768,43 @@ If OpenWindow(0, 100, 100, 456, 302, "quietHDD Settings",#PB_Window_SystemMenu |
       If GadgetID = #tb_mAPMValue
         mAPMValue = GetGadgetState(#tb_mAPMValue)
         SetGadgetText(#txt_mAPMValue, Str(mAPMValue))
-      ElseIf GadgetID = #bt_SetAPMValue
-        If GetGadgetState(#tb_mAPMValue)<100
-          SetGadgetText(#txt_mAPMWarning, "*** WARNING: Value less than 100 ***")
+        If mAPMValue < 100 
+          SetGadgetColor(#txt_mAPMValue, #PB_Gadget_FrontColor, RGB(255,0,0))
         Else
-          SetGadgetText(#txt_mAPMWarning, "")
+          SetGadgetColor(#txt_mAPMValue, #PB_Gadget_FrontColor, $0)
         EndIf
+        
+        
+      ElseIf GadgetID = #tb_mAAMValue
+          mAAMValue = GetGadgetState(#tb_mAAMValue)
+          SetGadgetText(#txt_mAAMValue, Str(mAAMValue))
+      ElseIf GadgetID = #bt_SetAPMValue
         If setataapm(GetGadgetState(#tb_mAPMValue))=0
           
         EndIf
-      ElseIf GadgetID = #tb_ACValue
-        ACValue = GetGadgetState(#tb_ACValue)
-        SetGadgetText(#txt_ACValue, Str(ACValue))
-        
-      ElseIf GadgetID = #tb_DCValue
-        DCValue = GetGadgetState(#tb_DCValue)
-        SetGadgetText(#txt_DCValue, Str(DCValue))
-        
+      ElseIf GadgetID = #tb_ACAPMValue
+        ACValue = GetGadgetState(#tb_ACAPMValue)
+        SetGadgetText(#txt_ACAPMValue, Str(ACValue))
+      ElseIf GadgetID = #tb_DCAPMValue
+        DCValue = GetGadgetState(#tb_DCAPMValue)
+        SetGadgetText(#txt_DCAPMValue, Str(DCValue))
+      ElseIf GadgetID = #tb_ACAAMValue
+        ACValue = GetGadgetState(#tb_ACAAMValue)
+        SetGadgetText(#txt_ACAAMValue, Str(ACValue))
+      ElseIf GadgetID = #tb_DCAAMValue
+        DCValue = GetGadgetState(#tb_DCAAMValue)
+        SetGadgetText(#txt_DCAAMValue, Str(DCValue))
       ElseIf GadgetID = #bt_Apply ; Write, Apply
-        ACAPMValue = GetGadgetState(#tb_ACValue)
-        DCAPMValue = GetGadgetState(#tb_DCValue)
+        ACAPMValue = GetGadgetState(#tb_ACAPMValue)
+        DCAPMValue = GetGadgetState(#tb_DCAPMValue)
+        ACAAMValue = GetGadgetState(#tb_ACAAMValue)
+        DCAAMValue = GetGadgetState(#tb_DCAAMValue)
         WriteSettings()
       ElseIf GadgetID = #bt_Ok  ; Write, Apply, CloseWin
-        ACAPMValue = GetGadgetState(#tb_ACValue)
-        DCAPMValue = GetGadgetState(#tb_DCValue)
+        ACAPMValue = GetGadgetState(#tb_ACAPMValue)
+        DCAPMValue = GetGadgetState(#tb_DCAPMValue)
+        ACAAMValue = GetGadgetState(#tb_ACAAMValue)
+        DCAAMValue = GetGadgetState(#tb_DCAAMValue)
         WriteSettings()
         ShowWindow_(WindowID(0),#SW_HIDE)
         Minimized=#True
@@ -708,7 +830,7 @@ DataSection
 EndDataSection
    
 ; jaPBe Version=3.8.10.733
-; FoldLines=010A015301550198
+; FoldLines=00F40109010B01220124016D016F01B201B401BB
 ; Build=199
 ; ProductName=quietHDD
 ; ProductVersion=1.0
@@ -720,9 +842,10 @@ EndDataSection
 ; EMail=joern.koerner@gmail.com
 ; Web=http://sites.google.com/site/quiethdd/
 ; Language=0x0000 Language Neutral
-; FirstLine=522
-; CursorPosition=704
+; FirstLine=573
+; CursorPosition=781
 ; EnableADMINISTRATOR
+; EnableThread
 ; EnableXP
 ; UseIcon=quiethdd.ico
 ; ExecutableFormat=Windows
