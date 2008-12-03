@@ -945,19 +945,19 @@ EndDataSection
    
 ; jaPBe Version=3.8.10.733
 ; FoldLines=00F5010A010C01230125016E017001B301B501F8
-; Build=219
+; Build=223
 ; ProductName=quietHDD
-; ProductVersion=1.0
-; FileDescription=quietHDD diables the Advanced Power Management (APM) of the primary Harddrive and eliminates the annoying click sound that the some HDD's produces when parking the head
-; FileVersion=1.0 Build %build%
-; InternalName=quietHDD
+; ProductVersion=1.5
+; FileDescription=quietHDD modifies the APM and AAM settings of the primary Harddrive
+; FileVersion=1.5 Build %build%
+; InternalName=quietHDD Build %build%
 ; LegalCopyright=Freeware - This software comes with absolutely NO WARRANTY! Use it on your own risk!
 ; OriginalFilename=quietHDD.exe
 ; EMail=joern.koerner@gmail.com
 ; Web=http://sites.google.com/site/quiethdd/
 ; Language=0x0000 Language Neutral
 ; FirstLine=291
-; CursorPosition=585
+; CursorPosition=545
 ; EnableADMINISTRATOR
 ; EnableThread
 ; EnableXP
