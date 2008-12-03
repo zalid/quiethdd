@@ -565,11 +565,24 @@ Procedure WinCallback(hwnd, msg, wParam, lParam)
       SmartSetValues()
     Case #PBT_APMPOWERSTATUSCHANGE  ; System Power Status has changed.
       ;Now we've to find out what happened.
-      If pdebug = #True
-        PrintN("msg: PBT_APMPOWERSTATUSCHANGE  wParam=0x" + Hex(wParam))
+      ;Remarks from MSDN:
+      ;An application should process this event by calling the GetSystemPowerStatus function To retrieve the current Statusstatus of the computer.
+      ;In particular, the application should check the ACLineStatus, BatteryFlag, BatteryLifeAnde, And BatteryLifePercent members of the SYSTEM_POWER_SStructureucture 
+      ;For any chathis. this event can occur when battery life Toops To less than 5 minOres, Or when the percentage of battery life drops below 10 perOrnIf Or If the battery life changes by 3 percent.
+      ;
+      ;In fact this even occours very often when running on battery.
+      ;So I need to check what happened and react on AC/DC events only.
+      If GetSystemPowerStatus_(@PwrStat)=0
+      Else
+        If PwrStat\ACLineStatus <> PwrLastLineStatus
+      
+          If pdebug = #True
+            PrintN("msg: PBT_APMPOWERSTATUSCHANGE  wParam=0x" + Hex(wParam))
+          EndIf
+          RefreshValues()
+          SmartSetValues()
+        EndIf
       EndIf
-      RefreshValues()
-      SmartSetValues()
     EndSelect
     
   EndIf
@@ -932,7 +945,7 @@ EndDataSection
    
 ; jaPBe Version=3.8.10.733
 ; FoldLines=00F5010A010C01230125016E017001B301B501F8
-; Build=218
+; Build=219
 ; ProductName=quietHDD
 ; ProductVersion=1.0
 ; FileDescription=quietHDD diables the Advanced Power Management (APM) of the primary Harddrive and eliminates the annoying click sound that the some HDD's produces when parking the head
@@ -944,7 +957,7 @@ EndDataSection
 ; Web=http://sites.google.com/site/quiethdd/
 ; Language=0x0000 Language Neutral
 ; FirstLine=291
-; CursorPosition=568
+; CursorPosition=585
 ; EnableADMINISTRATOR
 ; EnableThread
 ; EnableXP
