@@ -152,10 +152,10 @@ Structure ATA_PASS_THROUGH_EX_WITH_BUFFERS
   ucDataBuf.c[512]
 EndStructure
 
-Global DisableSuspend = 0
+Global DisableSuspend = 0, FirstRun=1
 Global pdebug=#False, tray=#True, warnuser=#True, help.s
-Global APMValue.l=255, ACAPMValue.l=255, DCAPMValue.l=255
-Global AAMValue.l=254, ACAAMValue.l=254, DCAAMValue.l=128
+Global APMValue.l=255, ACAPMValue.l=255, DCAPMValue.l=255, APMEnabled=1
+Global AAMValue.l=254, ACAAMValue.l=254, DCAAMValue.l=128, AAMEnabled=1
 Global PwrStat.SYSTEM_POWER_STATUS, PwrLastLineStatus.b
 
 help.s =          "quietHDD Build:" + Str(#jaPBe_ExecuteBuild)+CR+CR
@@ -246,18 +246,23 @@ EndProcedure
 Procedure ReadSettings()
   ; Try to open quietHDD.ini
   If OpenPreferences("quietHDD.ini")
+    FirstRun   = ReadPreferenceLong("FirstRun", 1)
     ACAPMValue = ReadPreferenceLong("AC_APM_Value", ACAPMValue)
     DCAPMValue = ReadPreferenceLong("DC_APM_Value", DCAPMValue)
     ACAAMValue = ReadPreferenceLong("AC_AAM_Value", ACAAMValue)
     DCAAMValue = ReadPreferenceLong("DC_AAM_Value", DCAAMValue)
+    AAMEnabled = ReadPreferenceLong("AAMEnabled", AAMEnabled)
+    APMEnabled = ReadPreferenceLong("APMEnabled", APMEnabled)
   Else
     ; Open failed. Try to create a new one
     If CreatePreferences("quietHDD.ini")
+      WritePreferenceLong("FirstRun", 0)
       WritePreferenceLong("AC_APM_Value", ACAPMValue)
       WritePreferenceLong("DC_APM_Value", DCAPMValue)
       WritePreferenceLong("AC_AAM_Value", ACAAMValue)
       WritePreferenceLong("DC_AAM_Value", DCAAMValue)
-      
+      WritePreferenceLong("AAMEnabled", AAMEnabled)
+      WritePreferenceLong("APMEnabled", APMEnabled)
     Else
       ; Create failed. Inform the user
       MessageRequester("Warning", "Failed to create quietHDD.ini preferences file."+Chr(13)+"User defined preferences will not be saved.",#PB_MessageRequester_Ok)
@@ -268,20 +273,24 @@ EndProcedure
 
 Procedure WriteSettings()
   ; Try to open quietHDD.ini
-  ;Global pdebug=#False, tray=#True, help.s, APMValue.l=255, ACAPMValue.l=255, DCAPMValue.l=255, warnuser=#True
-  
   If OpenPreferences("quietHDD.ini")
+    WritePreferenceLong("FirstRun", 0)
     WritePreferenceLong("AC_APM_Value", ACAPMValue)
     WritePreferenceLong("DC_APM_Value", DCAPMValue)
     WritePreferenceLong("AC_AAM_Value", ACAAMValue)
     WritePreferenceLong("DC_AAM_Value", DCAAMValue)
+    WritePreferenceLong("AAMEnabled", AAMEnabled)
+    WritePreferenceLong("APMEnabled", APMEnabled)
   Else
     ; Open failed. Try to create a new one
     If CreatePreferences("quietHDD.ini")
+      WritePreferenceLong("FirstRun", 0)
       WritePreferenceLong("AC_APM_Value", ACAPMValue)
       WritePreferenceLong("DC_APM_Value", DCAPMValue)
       WritePreferenceLong("AC_AAM_Value", ACAAMValue)
       WritePreferenceLong("DC_AAM_Value", DCAAMValue)
+      WritePreferenceLong("AAMEnabled", AAMEnabled)
+      WritePreferenceLong("APMEnabled", APMEnabled)
       
     Else
       ; Create failed. Inform the user
@@ -366,7 +375,7 @@ Procedure setapm(APMValue.l)
   ; EndIf
 EndProcedure
 
-Procedure.l setataaam(AAMValue.l)
+Procedure.l setataaam(AAMValue.l, silent=#False)
   ; \\.\PhysicalDrive0
   hDevice = CreateFile_( "\\.\PhysicalDrive0", #GENERIC_READ | #GENERIC_WRITE, #FILE_SHARE_READ | #FILE_SHARE_WRITE, 0, #OPEN_EXISTING, 0, 0)
   If hDevice = #INVALID_HANDLE_VALUE
@@ -411,7 +420,9 @@ Procedure.l setataaam(AAMValue.l)
   bytesRet.l = 0
   retval = DeviceIoControl_( hDevice, #IOCTL_ATA_PASS_THROUGH, @ab, dbsize.l, @ab, dbsize.l, @bytesRet, #Null) 
   If retval=0
-    MessageRequester("Error", "IOCTL_ATA_PASS_THROUGH failed. Reason:0x"+RSet(Hex(GetLastError_()), 8, "0")+Chr(13)+Chr(13)+"Run quietHDD with /DEBUG argument to get more information",#PB_MessageRequester_Ok)
+    If silent=#False
+      MessageRequester("Error", "IOCTL_ATA_PASS_THROUGH failed. Reason:0x"+RSet(Hex(GetLastError_()), 8, "0")+Chr(13)+Chr(13)+"Run quietHDD with /DEBUG argument to get more information",#PB_MessageRequester_Ok)
+    EndIf
   EndIf
   If pdebug=#True
     PrintN("Output registers:")
@@ -435,7 +446,7 @@ Procedure.l setataaam(AAMValue.l)
   EndIf
 EndProcedure
 
-Procedure.l setataapm(APMValue.l)
+Procedure.l setataapm(APMValue.l, silent=#False)
   ; \\.\PhysicalDrive0
   hDevice = CreateFile_( "\\.\PhysicalDrive0", #GENERIC_READ | #GENERIC_WRITE, #FILE_SHARE_READ | #FILE_SHARE_WRITE, 0, #OPEN_EXISTING, 0, 0)
   If hDevice = #INVALID_HANDLE_VALUE
@@ -480,7 +491,9 @@ Procedure.l setataapm(APMValue.l)
   bytesRet.l = 0
   retval = DeviceIoControl_( hDevice, #IOCTL_ATA_PASS_THROUGH, @ab, dbsize.l, @ab, dbsize.l, @bytesRet, #Null) 
   If retval=0
-    MessageRequester("Error", "IOCTL_ATA_PASS_THROUGH failed. Reason:0x"+RSet(Hex(GetLastError_()), 8, "0")+Chr(13)+Chr(13)+"Run quietHDD with /DEBUG argument to get more information",#PB_MessageRequester_Ok)
+    If silent=#False
+      MessageRequester("Error", "IOCTL_ATA_PASS_THROUGH failed. Reason:0x"+RSet(Hex(GetLastError_()), 8, "0")+Chr(13)+Chr(13)+"Run quietHDD with /DEBUG argument to get more information",#PB_MessageRequester_Ok)
+    EndIf
   EndIf
   If pdebug=#True
     PrintN("Output registers:")
@@ -532,18 +545,16 @@ Procedure RefreshValues()
 EndProcedure
 
 Procedure SmartSetValues()
-;  If GetSystemPowerStatus_(@PwrStat)=0
-;    MessageRequester("Warning", "GetSystemPowerStatus() failed. Unable to determine AC/DC informations.", #PB_MessageRequester_Ok)
-;  Else
-;    If PwrStat\ACLineStatus <> PwrLastLineStatus
-      setataapm(APMValue)
-      setataaam(AAMValue)      
-      If tray = #True
-        InfoText()
-        BlinkIcon()
-      EndIf
-;    EndIf
-;  EndIf
+  If APMEnabled=1
+    setataapm(APMValue)
+  EndIf
+  If AAMEnabled=1
+    setataaam(AAMValue)
+  EndIf
+  If tray = #True
+    InfoText()
+    BlinkIcon()
+  EndIf
 EndProcedure
 
 Procedure WinCallback(hwnd, msg, wParam, lParam)
@@ -590,6 +601,11 @@ Procedure WinCallback(hwnd, msg, wParam, lParam)
 EndProcedure
 
 
+
+
+;---------------------------------------------------------------------------------------------
+;- MAIN --------------------------------------------------------------------------------------
+;---------------------------------------------------------------------------------------------
 ReadSettings()
 
 pcount = CountProgramParameters()
@@ -718,6 +734,29 @@ If pcount >0
 EndIf
 
 CheckValues()
+
+;- Test compatibility of APM and AAM
+; Disable every non compatible feature ON THE FIRST RUN ONLY
+If FirstRun=1
+  If setataapm(128, #True) = -1
+    ;setataapm failed - disable it forever
+    APMEnabled = 0
+    apmtest.s = "APM Feature test failed. Disabled in future."
+  Else
+    APMEnabled = 1
+    apmtest.s = "APM Feature test succeeded"
+  EndIf
+  If setataaam(128, #True) = -1
+    ;setataaam failed - disable it forever
+    AAMEnabled = 0
+    aamtest.s = "AAM Feature test failed. Disabled in future."
+  Else
+    AAMEnabled = 1
+    aamtest.s = "AAM Feature test succeeded"
+  EndIf
+  WriteSettings()
+  MessageRequester("Compatibility test", "This is the first time quietHDD has been started."+CR+CR+"Test results:"+CR+apmtest+CR+aamtest+CR+CR+"This requester will not be shown again.",#PB_MessageRequester_Ok)
+EndIf
 
 If pdebug = #True
   OpenConsole()
@@ -944,8 +983,8 @@ DataSection
 EndDataSection
    
 ; jaPBe Version=3.8.10.733
-; FoldLines=00F5010A010C01230125016E017001B301B501F8
-; Build=223
+; FoldLines=00F5010F0111012C012E0177017901BE02070220022F0258
+; Build=228
 ; ProductName=quietHDD
 ; ProductVersion=1.5
 ; FileDescription=quietHDD modifies the APM and AAM settings of the primary Harddrive
@@ -956,13 +995,13 @@ EndDataSection
 ; EMail=joern.koerner@gmail.com
 ; Web=http://sites.google.com/site/quiethdd/
 ; Language=0x0000 Language Neutral
-; FirstLine=291
-; CursorPosition=545
+; FirstLine=462
+; CursorPosition=752
 ; EnableADMINISTRATOR
 ; EnableThread
 ; EnableXP
 ; UseIcon=quiethdd.ico
 ; ExecutableFormat=Windows
-; Executable=C:\Users\injk\eeeHDD\trunk\quietHDD.exe
+; Executable=C:\Users\injk\Source\quietHDD\trunk\quietHDD.exe
 ; DontSaveDeclare
 ; EOF
