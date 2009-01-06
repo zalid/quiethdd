@@ -1,4 +1,3 @@
-
 #BROADCAST_QUERY_DENY       = $424D5144
 #PBT_APMQUERYSUSPEND        = $00
 #WM_POWERBROADCAST          = $218
@@ -93,6 +92,8 @@ Enumeration
   #txt_mAAMValue
   #bt_SetAAMValue
   #ed_About
+  #cb_APMEnabled
+  #cb_AAMEnabled
 EndEnumeration
 
 
@@ -153,7 +154,7 @@ Structure ATA_PASS_THROUGH_EX_WITH_BUFFERS
 EndStructure
 
 Global DisableSuspend = 0, FirstRun=1
-Global pdebug=#False, tray=#True, warnuser=#True, help.s
+Global pdebug=#False, tray=#True, warnuser=#True, help.s, DoBlink=0
 Global APMValue.l=255, ACAPMValue.l=255, DCAPMValue.l=255, APMEnabled=1
 Global AAMValue.l=254, ACAAMValue.l=254, DCAAMValue.l=128, AAMEnabled=1
 Global PwrStat.SYSTEM_POWER_STATUS, PwrLastLineStatus.b
@@ -198,21 +199,20 @@ If Not IsUserAnAdmin_()
   End  
 EndIf
 
-Procedure AboutImageRequester(WindowID.l,Title$,Text1$,Text2$,Image.l)
-  ;LoadImage(1, Image$)
-  ;Image.l=ImageID(1)
-  ShellAbout_(WindowID, Title$+" # "+Text1$, Text2$, Image)
-EndProcedure
-
-
-Procedure BlinkIcon()
+Procedure TBlinkIcon()
   If tray=#True
-    For i = 1 To 5
-      ChangeSysTrayIcon(0, ImageID(1))
-      Delay(300)
-      ChangeSysTrayIcon(0, ImageID(0))
-      Delay(300)
-    Next i
+    Repeat
+      If DoBlink = 1
+        For i = 1 To 5
+          ChangeSysTrayIcon(0, ImageID(1))
+          Delay(300)
+          ChangeSysTrayIcon(0, ImageID(0))
+          Delay(300)
+        Next i
+        DoBlink = 0
+      EndIf
+      Delay(200)
+    ForEver
   EndIf
 EndProcedure
 
@@ -225,156 +225,26 @@ Procedure.s InfoText(text.s="")
     Else
       prefix.s = ""
     EndIf
-    txt.s = prefix + "APM:"+Str(APMValue)+" AAM:"+Str(AAMValue)+" last set on "+FormatDate("%YYYY-%MM-%DD %HH:%II:%SS", Date())
+    If APMEnabled = 1
+      txtAPM.s = Str(APMValue)
+    Else
+      txtAPM.s = "Disabled"
+    EndIf
+    If AAMEnabled = 1
+      txtAAM.s = Str(AAMValue)
+    Else
+      txtAAM.s = "Disabled"
+    EndIf
+    
+    txt.s = prefix + "APM:"+txtAPM+" AAM:"+txtAAM+" last set on "+FormatDate("%YYYY-%MM-%DD %HH:%II:%SS", Date())
   Else
     txt.s = text.s 
   EndIf
   If tray=#True
     SetMenuItemText(0, 1, txt)
-    SysTrayIconToolTip (0, "quietHDD"+Chr(13)+"Build: " + Str(#jaPBe_ExecuteBuild) + Chr(13) + prefix + "APMValue: "+Str(APMValue) + Chr(13) + prefix + "AAMValue: " + Str(AAMValue))
+    SysTrayIconToolTip (0, "quietHDD Build: " + Str(#jaPBe_ExecuteBuild) + Chr(13) + prefix + "APMValue: "+txtAPM + Chr(13) + prefix + "AAMValue: " + txtAAM)
   EndIf
   ProcedureReturn txt
-EndProcedure
-
-Procedure CheckValues()
-  If ACAPMValue<100 And warnuser=#True
-    MessageRequester("!!WARNING!!   ACAPMVALUE < 100   !!WARNING!!", help.s , #MB_OK|#MB_ICONINFORMATION) 
-  EndIf
-  If DCAPMValue<100 And warnuser=#True
-    MessageRequester("!!WARNING!!   DCAPMVALUE < 100   !!WARNING!!", help.s , #MB_OK|#MB_ICONINFORMATION) 
-  EndIf
-EndProcedure
-
-Procedure ReadSettings()
-  ; Try to open quietHDD.ini
-  If OpenPreferences("quietHDD.ini")
-    FirstRun   = ReadPreferenceLong("FirstRun", 1)
-    ACAPMValue = ReadPreferenceLong("AC_APM_Value", ACAPMValue)
-    DCAPMValue = ReadPreferenceLong("DC_APM_Value", DCAPMValue)
-    ACAAMValue = ReadPreferenceLong("AC_AAM_Value", ACAAMValue)
-    DCAAMValue = ReadPreferenceLong("DC_AAM_Value", DCAAMValue)
-    AAMEnabled = ReadPreferenceLong("AAMEnabled", AAMEnabled)
-    APMEnabled = ReadPreferenceLong("APMEnabled", APMEnabled)
-  Else
-    ; Open failed. Try to create a new one
-    If CreatePreferences("quietHDD.ini")
-      WritePreferenceLong("FirstRun", 0)
-      WritePreferenceLong("AC_APM_Value", ACAPMValue)
-      WritePreferenceLong("DC_APM_Value", DCAPMValue)
-      WritePreferenceLong("AC_AAM_Value", ACAAMValue)
-      WritePreferenceLong("DC_AAM_Value", DCAAMValue)
-      WritePreferenceLong("AAMEnabled", AAMEnabled)
-      WritePreferenceLong("APMEnabled", APMEnabled)
-    Else
-      ; Create failed. Inform the user
-      MessageRequester("Warning", "Failed to create quietHDD.ini preferences file."+Chr(13)+"User defined preferences will not be saved.",#PB_MessageRequester_Ok)
-    EndIf
-  EndIf
-  ClosePreferences()
-EndProcedure
-
-Procedure WriteSettings()
-  ; Try to open quietHDD.ini
-  If OpenPreferences("quietHDD.ini")
-    WritePreferenceLong("FirstRun", 0)
-    WritePreferenceLong("AC_APM_Value", ACAPMValue)
-    WritePreferenceLong("DC_APM_Value", DCAPMValue)
-    WritePreferenceLong("AC_AAM_Value", ACAAMValue)
-    WritePreferenceLong("DC_AAM_Value", DCAAMValue)
-    WritePreferenceLong("AAMEnabled", AAMEnabled)
-    WritePreferenceLong("APMEnabled", APMEnabled)
-  Else
-    ; Open failed. Try to create a new one
-    If CreatePreferences("quietHDD.ini")
-      WritePreferenceLong("FirstRun", 0)
-      WritePreferenceLong("AC_APM_Value", ACAPMValue)
-      WritePreferenceLong("DC_APM_Value", DCAPMValue)
-      WritePreferenceLong("AC_AAM_Value", ACAAMValue)
-      WritePreferenceLong("DC_AAM_Value", DCAAMValue)
-      WritePreferenceLong("AAMEnabled", AAMEnabled)
-      WritePreferenceLong("APMEnabled", APMEnabled)
-      
-    Else
-      ; Create failed. Inform the user
-      MessageRequester("Warning", "Failed to create quietHDD.ini preferences file."+Chr(13)+"User defined preferences will not be saved.",#PB_MessageRequester_Ok)
-    EndIf
-  EndIf
-  ClosePreferences()
-EndProcedure
-
-Procedure setapm(APMValue.l)
-  ; DO NOT USE THIS ANYMORE!
-  ; NOTE: I leave this in because it works. But IOCTL_IDE_PASS_THROUGH does not work on Vista anymore!
-  ; \\.\PhysicalDrive0
-
-  ; hDevice = CreateFile_( "\\.\PhysicalDrive0", #GENERIC_READ | #GENERIC_WRITE, #FILE_SHARE_READ | #FILE_SHARE_WRITE, 0, #OPEN_EXISTING, 0, 0)
-  ; If hDevice = #INVALID_HANDLE_VALUE
-    ; PrintN( "CreateFile failed.")
-    ; MessageRequester("Error", "Failed to open PhysicalDrive0. Ending now.",#PB_MessageRequester_Ok)
-    ; End
-  ; EndIf
-  ; 
-  ; ;Initialize buffers...
-  ; ; INPUT Commandbuffer
-  ; regBuf_IN.IDEREGS
-  ; regBuf_IN\bFeaturesReg  = 0  ;0
-  ; regBuf_IN\bSectorCountReg = 0  ;1 
-  ; regBuf_IN\bSectorNumberReg  = 0  ;2
-  ; regBuf_IN\bCylLowReg    = 0  ;3
-  ; regBuf_IN\bCylHighReg   = 0  ;4
-  ; regBuf_IN\bDriveHeadReg = 0  ;5
-  ; regBuf_IN\bCommandReg   = 0  ;6
-  ; regBuf_IN\bReserved   = 0  ; reg[7] is reserved for future use. Must be zero.
-  ; regBuf_IN\DataBufferSize  = 0  ;8
-  ; ; OUTPUT Commandbuffer
-  ; regBuf_OUT.IDEREGS
-  ; regBuf_OUT\bFeaturesReg = 0  ;0
-  ; regBuf_OUT\bSectorCountReg  = 0  ;1 
-  ; regBuf_OUT\bSectorNumberReg = 0  ;2
-  ; regBuf_OUT\bCylLowReg   = 0  ;3
-  ; regBuf_OUT\bCylHighReg  = 0  ;4
-  ; regBuf_OUT\bDriveHeadReg  = 0  ;5
-  ; regBuf_OUT\bCommandReg  = 0  ;6
-  ; regBuf_OUT\bReserved    = 0  ; reg[7] is reserved for future use. Must be zero.
-  ; regBuf_OUT\DataBufferSize = 0  ;8
-  ; 
-  ; bSize = SizeOf(regBuf_IN) ; Size of regBuf_IN - 8 for reg, 4 for DataBufferSize, 512 for Data
-  ; 
-  ; ; Prepare the ATA Command
-  ; regBuf_IN\bCommandReg  = #WIN_SETFEATURES
-  ; regBuf_IN\bFeaturesReg = #SETFEATURES_EN_APM
-  ; If APMValue<1
-    ; APMValue=1
-  ; EndIf
-  ; If APMValue>254
-    ; APMValue = 255
-    ; regBuf_IN\bFeaturesReg = #SETFEATURES_DIS_APM
-    ; regBuf_IN\bSectorCountReg = 0
-    ; ;PrintN("Disable APM.")
-  ; Else
-    ; regBuf_IN\bSectorCountReg = APMValue
-    ; ;PrintN("Setting APM to "+ Str(APMValue)+".")
-  ; EndIf
- ; 
-  ; bytesRet.l = 0
-  ; retval = DeviceIoControl_( hDevice, #IOCTL_IDE_PASS_THROUGH, @regBuf_IN, bSize, @regBuf_OUT, bSize, @bytesRet, #Null) 
-  ; If retval=0
-    ; CompilerIf #DEBUG = 1
-      ; txt.s = "IOCTL_IDE_PASS_THROUGH failed. Error="+Str(GetLastError_())+Chr(13)
-      ; txt.s = txt.s + "  In : CMD=0x"+ZHex(regBuf_IN\bCommandReg)+" FR=0x"+ZHex(regBuf_IN\bFeaturesReg)+" SC=0x"+ZHex(regBuf_IN\bSectorCountReg)+" SN=0x"+ZHex(regBuf_IN\bSectorNumberReg)+" CL=0x"+ZHex(regBuf_IN\bCylLowReg)+" CH=0x"+ZHex(regBuf_IN\bCylHighReg)+" SEL=0x"+ZHex(regBuf_IN\bDriveHeadReg)+Chr(13)
-      ; txt.s = txt.s + " Out : CMD=0x"+ZHex(regBuf_OUT\bCommandReg)+" FR=0x"+ZHex(regBuf_OUT\bFeaturesReg)+" SC=0x"+ZHex(regBuf_OUT\bSectorCountReg)+" SN=0x"+ZHex(regBuf_OUT\bSectorNumberReg)+" CL=0x"+ZHex(regBuf_OUT\bCylLowReg)+" CH=0x"+ZHex(regBuf_OUT\bCylHighReg)+" SEL=0x"+ZHex(regBuf_OUT\bDriveHeadReg)+Chr(13)
-    ; CompilerElse
-      ; txt.s = ""
-    ; CompilerEndIf
-    ; MessageRequester("Error", "IOCTL_IDE_PASS_THROUGH failed. Reason:0x"+RSet(Hex(GetLastError_()), 8, "0")+Chr(13)+Chr(13)+txt,#PB_MessageRequester_Ok)
-  ; EndIf
-  ; ; PrintN( "bytesret: "+Str( bytesRet))
-  ; ; PrintN("  In : CMD=0x"+ZHex(regBuf_IN\bCommandReg)+" FR=0x"+ZHex(regBuf_IN\bFeaturesReg)+" SC=0x"+ZHex(regBuf_IN\bSectorCountReg)+" SN=0x"+ZHex(regBuf_IN\bSectorNumberReg)+" CL=0x"+ZHex(regBuf_IN\bCylLowReg)+" CH=0x"+ZHex(regBuf_IN\bCylHighReg)+" SEL=0x"+ZHex(regBuf_IN\bDriveHeadReg))
-  ; ; PrintN(" Out : CMD=0x"+ZHex(regBuf_OUT\bCommandReg)+" FR=0x"+ZHex(regBuf_OUT\bFeaturesReg)+" SC=0x"+ZHex(regBuf_OUT\bSectorCountReg)+" SN=0x"+ZHex(regBuf_OUT\bSectorNumberReg)+" CL=0x"+ZHex(regBuf_OUT\bCylLowReg)+" CH=0x"+ZHex(regBuf_OUT\bCylHighReg)+" SEL=0x"+ZHex(regBuf_OUT\bDriveHeadReg))
-  ; 
-  ; If hDevice
-    ; CloseHandle_( hDevice )
-  ; EndIf
 EndProcedure
 
 Procedure.l setataaam(AAMValue.l, silent=#False)
@@ -462,7 +332,7 @@ Procedure.l setataapm(APMValue.l, silent=#False)
   ab\DataBufferOffset   = OffsetOf(ATA_PASS_THROUGH_EX_WITH_BUFFERS\ucDataBuf) 
   ab\TimeOutValue       = 1 ; 10
   dbsize.l              = SizeOf(ATA_PASS_THROUGH_EX_WITH_BUFFERS)
-
+  
   ab\AtaFlags           = #ATA_FLAGS_DATA_IN
   ab\DataTransferLength = 512  
   ab\ucDataBuf[0]       = $CF   ; magic=0xcf
@@ -489,7 +359,7 @@ Procedure.l setataapm(APMValue.l, silent=#False)
     PrintN("  inCylHighReg       0x"+ZHex(ab\CurrentTaskFile[#inCylHighReg]     )+"    inDriveHeadReg    0x"+ZHex(ab\CurrentTaskFile[#inDriveHeadReg]))
     PrintN("  inCommandReg       0x"+ZHex(ab\CurrentTaskFile[#inCommandReg])) ;+"    inSectorCountReg 0x"+ZHex(ab\CurrentTaskFile[#inSectorCountReg]))
   EndIf
-
+  
   bytesRet.l = 0
   retval = DeviceIoControl_( hDevice, #IOCTL_ATA_PASS_THROUGH, @ab, dbsize.l, @ab, dbsize.l, @bytesRet, #Null) 
   If retval=0
@@ -519,6 +389,15 @@ Procedure.l setataapm(APMValue.l, silent=#False)
   EndIf
 EndProcedure
 
+Procedure CheckValues()
+  If ACAPMValue<100 And warnuser=#True
+    MessageRequester("!!WARNING!!   ACAPMVALUE < 100   !!WARNING!!", help.s , #MB_OK|#MB_ICONINFORMATION) 
+  EndIf
+  If DCAPMValue<100 And warnuser=#True
+    MessageRequester("!!WARNING!!   DCAPMVALUE < 100   !!WARNING!!", help.s , #MB_OK|#MB_ICONINFORMATION) 
+  EndIf
+EndProcedure
+
 Procedure RefreshValues()
   If GetSystemPowerStatus_(@PwrStat)=0
     MessageRequester("Warning", "GetSystemPowerStatus() failed. Unable to determine AC/DC informations.", #PB_MessageRequester_Ok)
@@ -533,7 +412,7 @@ Procedure RefreshValues()
       EndIf
       PwrLastLineStatus =  PwrStat\ACLineStatus
     EndIf
-
+    
     If PwrStat\ACLineStatus = 0  ;Battery
       APMValue = DCAPMValue
       AAMValue = DCAAMValue
@@ -556,9 +435,80 @@ Procedure SmartSetValues()
   EndIf
   If tray = #True
     InfoText()
-    BlinkIcon()
+    ;BlinkIcon()
+    DoBlink = 1
   EndIf
 EndProcedure
+
+Procedure ReadSettings()
+  ; Try to open quietHDD.ini
+  If OpenPreferences("quietHDD.ini")
+    FirstRun   = ReadPreferenceLong("FirstRun", 1)
+    ACAPMValue = ReadPreferenceLong("AC_APM_Value", ACAPMValue)
+    DCAPMValue = ReadPreferenceLong("DC_APM_Value", DCAPMValue)
+    ACAAMValue = ReadPreferenceLong("AC_AAM_Value", ACAAMValue)
+    DCAAMValue = ReadPreferenceLong("DC_AAM_Value", DCAAMValue)
+    AAMEnabled = ReadPreferenceLong("AAMEnabled", AAMEnabled)
+    APMEnabled = ReadPreferenceLong("APMEnabled", APMEnabled)
+  Else
+    ; Open failed. Try to create a new one
+    If CreatePreferences("quietHDD.ini")
+      WritePreferenceLong("FirstRun", 0)
+      WritePreferenceLong("AC_APM_Value", ACAPMValue)
+      WritePreferenceLong("DC_APM_Value", DCAPMValue)
+      WritePreferenceLong("AC_AAM_Value", ACAAMValue)
+      WritePreferenceLong("DC_AAM_Value", DCAAMValue)
+      WritePreferenceLong("AAMEnabled", AAMEnabled)
+      WritePreferenceLong("APMEnabled", APMEnabled)
+    Else
+      ; Create failed. Inform the user
+      MessageRequester("Warning", "Failed to create quietHDD.ini preferences file."+Chr(13)+"User defined preferences will not be saved.",#PB_MessageRequester_Ok)
+    EndIf
+  EndIf
+  ClosePreferences()
+EndProcedure
+
+Procedure WriteSettings()
+  ; Try to open quietHDD.ini
+  If OpenPreferences("quietHDD.ini")
+    WritePreferenceLong("FirstRun", 0)
+    WritePreferenceLong("AC_APM_Value", ACAPMValue)
+    WritePreferenceLong("DC_APM_Value", DCAPMValue)
+    WritePreferenceLong("AC_AAM_Value", ACAAMValue)
+    WritePreferenceLong("DC_AAM_Value", DCAAMValue)
+    WritePreferenceLong("AAMEnabled", AAMEnabled)
+    WritePreferenceLong("APMEnabled", APMEnabled)
+  Else
+    ; Open failed. Try to create a new one
+    If CreatePreferences("quietHDD.ini")
+      WritePreferenceLong("FirstRun", 0)
+      WritePreferenceLong("AC_APM_Value", ACAPMValue)
+      WritePreferenceLong("DC_APM_Value", DCAPMValue)
+      WritePreferenceLong("AC_AAM_Value", ACAAMValue)
+      WritePreferenceLong("DC_AAM_Value", DCAAMValue)
+      WritePreferenceLong("AAMEnabled", AAMEnabled)
+      WritePreferenceLong("APMEnabled", APMEnabled)
+      
+    Else
+      ; Create failed. Inform the user
+      MessageRequester("Warning", "Failed to create quietHDD.ini preferences file."+Chr(13)+"User defined preferences will not be saved.",#PB_MessageRequester_Ok)
+    EndIf
+  EndIf
+  ClosePreferences()
+EndProcedure
+
+Procedure ApplySettings()
+  ACAPMValue = GetGadgetState(#tb_ACAPMValue)
+  DCAPMValue = GetGadgetState(#tb_DCAPMValue)
+  ACAAMValue = GetGadgetState(#tb_ACAAMValue)
+  DCAAMValue = GetGadgetState(#tb_DCAAMValue)
+  APMEnabled = GetGadgetState(#cb_APMEnabled)
+  AAMEnabled = GetGadgetState(#cb_AAMEnabled)
+  WriteSettings()
+  RefreshValues()
+  SmartSetValues()
+EndProcedure
+
 
 Procedure WinCallback(hwnd, msg, wParam, lParam)
   result = #PB_ProcessPureBasicEvents
@@ -768,44 +718,45 @@ EndIf
 
 If OpenWindow(0, 100, 100, 472, 300, "quietHDD Settings",#PB_Window_SystemMenu |  #PB_Window_Invisible) ;#PB_Window_MinimizeGadget | #PB_Window_MaximizeGadget |
   
-  If CreateGadgetList(WindowID(#Window_0))
-    ButtonGadget(#bt_Ok, 184, 272, 90, 22, "Ok")
-    ButtonGadget(#bt_Apply, 376, 272, 90, 22, "Apply")
-    ButtonGadget(#bt_Cancel, 280, 272, 90, 22, "Cancel")
-    
-    ;- Panel0
-    PanelGadget(#Panel_0, 8, 8, 456, 256)
-      AddGadgetItem(#Panel_0, -1, "APM Settings")
-      Frame3DGadget(#Frame3D_0, 6, 10, 440, 210, "APM - AC and DC Advanced Power Management Settings")
-      TrackBarGadget(#tb_ACAPMValue, 14, 50, 392, 30, 0, 255)
-      TextGadget(#Text_1, 14, 34, 220, 20, "AC Value (running on AC power)")
-      TrackBarGadget(#tb_DCAPMValue, 14, 106, 392, 30, 0, 255)
-      TextGadget(#Text_3, 14, 90, 220, 16, "DC Value (running on battery)")
-      TextGadget(#txt_ACAPMValue, 414, 53, 24, 16, "123", #PB_Text_Right)
-      TextGadget(#txt_DCAPMValue, 414, 109, 24, 16, "123", #PB_Text_Right)
-      AddGadgetItem(#Panel_0, -1, "AAM Settings")
-      Frame3DGadget(#Frame3D_2, 6, 10, 440, 210, "AAM - AC and DC Automatic Acoustic Management")
-      TrackBarGadget(#tb_ACAAMValue, 14, 50, 392, 32, 128, 254)
-      TextGadget(#Text_7, 14, 34, 384, 16, "AC Value (running on AC power)")
-      TrackBarGadget(#tb_DCAAMValue, 14, 106, 392, 32, 128, 254)
-      TextGadget(#Text_9, 14, 90, 384, 16, "DC Value (running on battery)")
-      TextGadget(#txt_ACAAMValue, 414, 53, 24, 16, "123", #PB_Text_Right)
-      TextGadget(#txt_DCAAMValue, 414, 109, 24, 16, "123", #PB_Text_Right)
-      AddGadgetItem(#Panel_0, -1, "Manual Settings for testing")
-      Frame3DGadget(#Frame3D_1, 6, 10, 440, 210, "Manual APM and AAM Settings")
-      TrackBarGadget(#tb_mAPMValue, 14, 50, 392, 32, 0, 255)
-      TextGadget(#Text_20, 14, 34, 384, 16, "APM Value (0=most active - 255 disabled)")
-      ButtonGadget(#bt_SetAPMValue, 22, 90, 370, 22, "Set APM Value")
-      TextGadget(#txt_mAPMValue, 414, 53, 24, 16, "123", #PB_Text_Right)
-      TrackBarGadget(#tb_mAAMValue, 14, 146, 392, 32, 128, 254)
-      TextGadget(#Text_22, 14, 130, 384, 16, "AAM Value (128=quiet - 254=fast)")
-      TextGadget(#txt_mAAMValue, 414, 149, 24, 16, "123", #PB_Text_Right)
-      ButtonGadget(#bt_SetAAMValue, 22, 186, 370, 22, "Set AAM Vlaue")
-      AddGadgetItem(#Panel_0, -1, "Misc Settings")
-      AddGadgetItem(#Panel_0, -1, "About")
-      EditorGadget(#ed_About, 6, 2, 440, 224, #PB_Editor_ReadOnly)
-      SetGadgetText(#ed_About, help.s)
-    CloseGadgetList()
+  ButtonGadget(#bt_Ok, 184, 272, 90, 22, "Ok")
+  ButtonGadget(#bt_Apply, 376, 272, 90, 22, "Apply")
+  ButtonGadget(#bt_Cancel, 280, 272, 90, 22, "Cancel")
+  
+  ;- Panel0
+  PanelGadget(#Panel_0, 8, 8, 456, 256)
+    AddGadgetItem(#Panel_0, -1, "APM Settings")
+     Frame3DGadget(#Frame3D_0, 6, 10, 440, 210, "APM - AC and DC Advanced Power Management Settings")
+     TrackBarGadget(#tb_ACAPMValue, 14, 50, 392, 30, 0, 255)
+     TextGadget(#Text_1, 14, 34, 220, 20, "AC Value (running on AC power)")
+     TrackBarGadget(#tb_DCAPMValue, 14, 106, 392, 30, 0, 255)
+     TextGadget(#Text_3, 14, 90, 220, 16, "DC Value (running on battery)")
+     TextGadget(#txt_ACAPMValue, 414, 53, 24, 16, "123", #PB_Text_Right)
+     TextGadget(#txt_DCAPMValue, 414, 109, 24, 16, "123", #PB_Text_Right)
+    AddGadgetItem(#Panel_0, -1, "AAM Settings")
+     Frame3DGadget(#Frame3D_2, 6, 10, 440, 210, "AAM - AC and DC Automatic Acoustic Management")
+     TrackBarGadget(#tb_ACAAMValue, 14, 50, 392, 32, 128, 254)
+     TextGadget(#Text_7, 14, 34, 384, 16, "AC Value (running on AC power)")
+     TrackBarGadget(#tb_DCAAMValue, 14, 106, 392, 32, 128, 254)
+     TextGadget(#Text_9, 14, 90, 384, 16, "DC Value (running on battery)")
+     TextGadget(#txt_ACAAMValue, 414, 53, 24, 16, "123", #PB_Text_Right)
+     TextGadget(#txt_DCAAMValue, 414, 109, 24, 16, "123", #PB_Text_Right)
+    AddGadgetItem(#Panel_0, -1, "Manual Settings for testing")
+     Frame3DGadget(#Frame3D_1, 6, 10, 440, 210, "Manual APM and AAM Settings")
+     TrackBarGadget(#tb_mAPMValue, 14, 50, 392, 32, 0, 255)
+     TextGadget(#Text_20, 14, 34, 384, 16, "APM Value (0=most active - 255 disabled)")
+     ButtonGadget(#bt_SetAPMValue, 22, 90, 370, 22, "Set APM Value")
+     TextGadget(#txt_mAPMValue, 414, 53, 24, 16, "123", #PB_Text_Right)
+     TrackBarGadget(#tb_mAAMValue, 14, 146, 392, 32, 128, 254)
+     TextGadget(#Text_22, 14, 130, 384, 16, "AAM Value (128=quiet - 254=fast)")
+     TextGadget(#txt_mAAMValue, 414, 149, 24, 16, "123", #PB_Text_Right)
+     ButtonGadget(#bt_SetAAMValue, 22, 186, 370, 22, "Set AAM Vlaue")
+    AddGadgetItem(#Panel_0, -1, "Misc Settings")
+     CheckBoxGadget(#cb_APMEnabled, 6, 10, 384, 16, "Enable APM Control") : SetGadgetState(#cb_APMEnabled, APMEnabled)
+     CheckBoxGadget(#cb_AAMEnabled, 6, 30, 384, 16, "Enable AAM Control") : SetGadgetState(#cb_AAMEnabled, AAMEnabled)
+    AddGadgetItem(#Panel_0, -1, "About")
+    EditorGadget(#ed_About, 6, 2, 440, 224, #PB_Editor_ReadOnly)
+    SetGadgetText(#ed_About, help.s)
+  CloseGadgetList() ;Panel
     
     SetGadgetState(#tb_ACAPMValue, ACAPMValue)
     SetGadgetState(#tb_DCAPMValue, DCAPMValue)
@@ -820,7 +771,7 @@ If OpenWindow(0, 100, 100, 472, 300, "quietHDD Settings",#PB_Window_SystemMenu |
     SetGadgetText(#txt_DCAAMValue, Str(DCAAMValue))
     SetGadgetState(#tb_mAAMValue, 128)
     SetGadgetText(#txt_mAAMValue, Str(128))
-  EndIf
+  
   
   SetWindowCallback(@WinCallback())
 
@@ -842,6 +793,7 @@ If OpenWindow(0, 100, 100, 472, 300, "quietHDD Settings",#PB_Window_SystemMenu |
     CatchImage(1, ?gicon)
     AddSysTrayIcon(0, WindowID(0), ImageID(0))
     SysTrayIconToolTip (0, "quietHDD"+Chr(13)+"Build: " + Str(#jaPBe_ExecuteBuild) + Chr(13) + "APMValue: "+Str(APMValue))
+    blinkThread = CreateThread(@TBlinkIcon(),0)
   EndIf
 
   
@@ -890,7 +842,8 @@ If OpenWindow(0, 100, 100, 472, 300, "quietHDD Settings",#PB_Window_SystemMenu |
           
           If tray = #True
             InfoText()
-            BlinkIcon()
+            ;BlinkIcon()
+            DoBlink = 1
           EndIf
         Case 5 ; About/Help
           ShowWindow_(WindowID(0),#SW_SHOW)
@@ -907,7 +860,7 @@ If OpenWindow(0, 100, 100, 472, 300, "quietHDD Settings",#PB_Window_SystemMenu |
     If EventID=#PB_Event_CloseWindow And Minimized=#False ; <-- Check for the eXit Button and not SysTrayIcon
       ShowWindow_(WindowID(0),#SW_HIDE)
       Minimized=#True
-      ;TODO: Apply settings before closeing window
+      ApplySettings()
     EndIf
 
     
@@ -948,24 +901,12 @@ If OpenWindow(0, 100, 100, 472, 300, "quietHDD Settings",#PB_Window_SystemMenu |
         DCValue = GetGadgetState(#tb_DCAAMValue)
         SetGadgetText(#txt_DCAAMValue, Str(DCValue))
       ElseIf GadgetID = #bt_Apply ; Write, Apply
-        ACAPMValue = GetGadgetState(#tb_ACAPMValue)
-        DCAPMValue = GetGadgetState(#tb_DCAPMValue)
-        ACAAMValue = GetGadgetState(#tb_ACAAMValue)
-        DCAAMValue = GetGadgetState(#tb_DCAAMValue)
-        WriteSettings()
-        RefreshValues()
-        SmartSetValues()
+        ApplySettings()
       ElseIf GadgetID = #bt_Ok  ; Write, Apply, CloseWin
-        ACAPMValue = GetGadgetState(#tb_ACAPMValue)
-        DCAPMValue = GetGadgetState(#tb_DCAPMValue)
-        ACAAMValue = GetGadgetState(#tb_ACAAMValue)
-        DCAAMValue = GetGadgetState(#tb_DCAAMValue)
-        WriteSettings()
-        RefreshValues()
-        SmartSetValues()
+        ApplySettings()
         ShowWindow_(WindowID(0),#SW_HIDE)
         Minimized=#True
-      ElseIf GadgetID = #bt_Cancel
+        ElseIf GadgetID = #bt_Cancel
         ShowWindow_(WindowID(0),#SW_HIDE)
         Minimized=#True
       EndIf
@@ -978,8 +919,6 @@ If OpenWindow(0, 100, 100, 472, 300, "quietHDD Settings",#PB_Window_SystemMenu |
 EndIf ;OpenWindow
 
 End 
-
-
 
 DataSection
   nicon: IncludeBinary "quiethdd.ico"
@@ -996,8 +935,8 @@ EndDataSection
 ; CursorPosition=162
 ; ExecutableFormat=Windows
 ; DontSaveDeclare 
-; jaPBe Version=3.8.10.733
-; Build=231
+; Build=248
+; Manual Parameter T="C:\Users\injk\Source\quietHDD\trunk\quiethdd.pb" "/CHM:quiethdd.CHM" /THRD
 ; ProductName=quietHDD
 ; ProductVersion=1.5
 ; FileDescription=quietHDD modifies the APM and AAM settings of the primary Harddrive
@@ -1008,8 +947,7 @@ EndDataSection
 ; EMail=joern.koerner@gmail.com
 ; Web=http://sites.google.com/site/quiethdd/
 ; Language=0x0000 Language Neutral
-; FirstLine=245
-; CursorPosition=249
+; ShortFootprint
 ; EnableADMINISTRATOR
 ; EnableThread
 ; EnableXP
