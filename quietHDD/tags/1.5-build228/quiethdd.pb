@@ -983,7 +983,6 @@ DataSection
 EndDataSection
    
 ; jaPBe Version=3.8.10.733
-; FoldLines=00F5010F0111012C012E0177017901BE02070220022F0258
 ; Build=228
 ; ProductName=quietHDD
 ; ProductVersion=1.5
