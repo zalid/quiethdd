@@ -158,6 +158,8 @@ Global APMValue.l=255, ACAPMValue.l=255, DCAPMValue.l=255, APMEnabled=1
 Global AAMValue.l=254, ACAAMValue.l=254, DCAAMValue.l=128, AAMEnabled=1
 Global PwrStat.SYSTEM_POWER_STATUS, PwrLastLineStatus.b
 
+;-#jaPBe_ExecuteBuild = 999
+
 help.s =          "quietHDD Build:" + Str(#jaPBe_ExecuteBuild)+CR+CR
 help.s = help.s + "Homepage http://sites.google.com/site/quiethdd/"+CR+CR
 help.s = help.s + "quietHDD disables/modifies the harddrives APM and AAM feature setting"+CR
@@ -525,21 +527,22 @@ Procedure RefreshValues()
       PrintN("PwrStat\ACAAMValue: " + Str(PwrStat\ACLineStatus))
       PrintN("PwrLastLineStatus : " + Str(PwrLastLineStatus))
     EndIf
-      If PwrStat\ACLineStatus <> PwrLastLineStatus
-        If pdebug=#True
-          PrintN("Power Line status changed.")
-        EndIf
-        PwrLastLineStatus =  PwrStat\ACLineStatus
-      If PwrStat\ACLineStatus = 0  ;Battery
-        APMValue = DCAPMValue
-        AAMValue = DCAAMValue
-      ElseIf PwrStat\ACLineStatus = 1 ;AC Power
-        APMValue = ACAPMValue
-        AAMValue = ACAAMValue
-      Else
-        ;Unknown power status
-        InfoText("Unknown Power Status")
+    If PwrStat\ACLineStatus <> PwrLastLineStatus
+      If pdebug=#True
+        PrintN("Power Line status changed.")
       EndIf
+      PwrLastLineStatus =  PwrStat\ACLineStatus
+    EndIf
+
+    If PwrStat\ACLineStatus = 0  ;Battery
+      APMValue = DCAPMValue
+      AAMValue = DCAAMValue
+    ElseIf PwrStat\ACLineStatus = 1 ;AC Power
+      APMValue = ACAPMValue
+      AAMValue = ACAAMValue
+    Else
+      ;Unknown power status
+      InfoText("Unknown Power Status")
     EndIf
   EndIf
 EndProcedure
@@ -733,7 +736,7 @@ If pcount >0
   Next
 EndIf
 
-CheckValues()
+CheckValues()   ; Check the values and warn the user when they are too low
 
 ;- Test compatibility of APM and AAM
 ; Disable every non compatible feature ON THE FIRST RUN ONLY
@@ -847,6 +850,7 @@ If OpenWindow(0, 100, 100, 472, 300, "quietHDD Settings",#PB_Window_SystemMenu |
     MessageRequester("Warning", "GetSystemPowerStatus() failed. Unable to determine AC/DC informations.", #PB_MessageRequester_Ok)
   Else
     PwrLastLineStatus = PwrStat\ACLineStatus
+    RefreshValues()
     SmartSetValues()  
   EndIf
   
@@ -981,10 +985,19 @@ DataSection
   nicon: IncludeBinary "quiethdd.ico"
   gicon: IncludeBinary "quiethdd_gn.ico"
 EndDataSection
-   
+  
+; IDE Options = PureBasic 4.30 (Windows - x86)
+; CursorPosition = 547
+; FirstLine = 519
+; Folding = ---
 ; jaPBe Version=3.8.10.733
-; FoldLines=00F5010F0111012C012E0177017901BE02070220022F0258
-; Build=228
+; Build=0
+; FirstLine=132
+; CursorPosition=162
+; ExecutableFormat=Windows
+; DontSaveDeclare 
+; jaPBe Version=3.8.10.733
+; Build=231
 ; ProductName=quietHDD
 ; ProductVersion=1.5
 ; FileDescription=quietHDD modifies the APM and AAM settings of the primary Harddrive
@@ -995,8 +1008,8 @@ EndDataSection
 ; EMail=joern.koerner@gmail.com
 ; Web=http://sites.google.com/site/quiethdd/
 ; Language=0x0000 Language Neutral
-; FirstLine=462
-; CursorPosition=752
+; FirstLine=245
+; CursorPosition=249
 ; EnableADMINISTRATOR
 ; EnableThread
 ; EnableXP
