@@ -829,11 +829,11 @@ If OpenWindow(0, 100, 100, 472, 300, "quietHDD Settings",#PB_Window_SystemMenu |
           Minimized=#False
         Case 3 ; Disable suspend
           If tray = 1
-            If GetMenuItemState(0,2) = 1
-              SetMenuItemState(0,2,0)
+            If GetMenuItemState(0,3) = 1
+              SetMenuItemState(0,3,0)
               DisableSuspend = 0
             Else
-              SetMenuItemState(0,2,1)
+              SetMenuItemState(0,3,1)
               DisableSuspend = 1
             EndIf
           EndIf
@@ -934,8 +934,8 @@ EndDataSection
 ; FirstLine=132
 ; CursorPosition=162
 ; ExecutableFormat=Windows
-; DontSaveDeclare 
-; Build=248
+; DontSaveDeclare  
+; Build=250
 ; Manual Parameter T="C:\Users\injk\Source\quietHDD\trunk\quiethdd.pb" "/CHM:quiethdd.CHM" /THRD
 ; ProductName=quietHDD
 ; ProductVersion=1.5
